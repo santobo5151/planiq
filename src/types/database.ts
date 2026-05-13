@@ -57,6 +57,7 @@ export interface Budget {
   id: string
   event_id: string
   category: string
+  description: string | null
   estimated_amount: number | null
   actual_amount: number | null
   notes: string | null
@@ -71,6 +72,8 @@ export interface Checklist {
   event_id: string
   title: string
   due_date: string | null
+  category: string | null
+  notes: string | null
   status: ChecklistStatus
   ai_generated: boolean
   created_at: string
@@ -107,4 +110,8 @@ export interface CreateEventInput {
   food_preferences?: string
 }
 
-export type { GeneratedPlan } from '@/lib/ai/schemas'
+export type {
+  GeneratedPlan,
+  GeneratedBudget,
+  GeneratedChecklist,
+} from '@/lib/ai/schemas'

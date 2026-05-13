@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { GeneratePlanButton } from '@/components/events/generate-plan-button'
+import { BudgetGenerateButton } from '@/components/events/budget-generate-button'
 import type { GeneratedPlan } from '@/types/database'
 
 const PRIORITY_STYLES: Record<
@@ -192,12 +193,7 @@ function PlanSections({
       </section>
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Link
-          href={`/events/${eventId}/budget`}
-          className={buttonVariants({ variant: 'outline' })}
-        >
-          Generate Budget
-        </Link>
+        <BudgetGenerateButton eventId={eventId} />
         <GeneratePlanButton eventId={eventId} mode="regenerate" />
       </div>
     </div>

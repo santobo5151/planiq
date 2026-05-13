@@ -1,5 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Event as PlanIQEvent, EventPlan } from '@/types/database'
+import type {
+  Event as PlanIQEvent,
+  EventPlan,
+  Budget,
+  Checklist,
+} from '@/types/database'
 
 export async function getPlannerEvents(userId: string): Promise<PlanIQEvent[]> {
   const supabase = createClient()
@@ -58,4 +63,36 @@ export async function getEventPlan(eventId: string): Promise<EventPlan | null> {
     return null
   }
   return (data as EventPlan) ?? null
+}
+
+export async function getBudget(eventId: string): Promise<Budget[]> {
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from('budgets')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('category', { ascending: true })
+
+  if (error) {
+    console.error('getBudget failed:', error.message)
+    return []
+  }
+  return (data ?? []) as Budget[]
+}
+
+export async function getChecklist(eventId: string): Promise<Checklist[]> {
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from('checklists')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('due_date', { ascending: true, nullsFirst: false })
+
+  if (error) {
+    console.error('getChecklist failed:', error.message)
+    return []
+  }
+  return (data ?? []) as Checklist[]
 }

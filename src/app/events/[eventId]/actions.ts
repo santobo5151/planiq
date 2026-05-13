@@ -2,10 +2,14 @@
 
 import { requireAuth, getUserProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { getEventById } from '@/services/events'
-import { generateEventPlan } from '@/services/ai'
+import { getEventById, getEventPlan } from '@/services/events'
+import {
+  generateEventPlan,
+  generateEventBudget,
+  generateEventChecklist,
+} from '@/services/ai'
 import { ANTHROPIC_MODEL } from '@/lib/ai/anthropic'
-import type { CreateEventInput } from '@/types/database'
+import type { CreateEventInput, BudgetStatus, ChecklistStatus } from '@/types/database'
 
 const ALLOWED_STATUSES = ['draft', 'active', 'completed'] as const
 type AllowedStatus = (typeof ALLOWED_STATUSES)[number]
@@ -167,6 +171,152 @@ export async function generatePlanAction(
   } catch (e) {
     const message =
       e instanceof Error ? e.message : 'Plan generation failed unexpectedly.'
+    return { success: false, error: message }
+  }
+}
+
+// ── Budget generation action ────────────────────────────────────────────────
+
+export type GenerateBudgetResult =
+  | { success: true; eventId: string }
+  | { success: false; error: string }
+
+export async function generateBudgetAction(
+  eventId: string
+): Promise<GenerateBudgetResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner') {
+    return { success: false, error: 'Only planners can generate event budgets' }
+  }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event) {
+    return { success: false, error: 'Event not found' }
+  }
+
+  const plan = await getEventPlan(eventId)
+  if (!plan) {
+    return {
+      success: false,
+      error: 'Please generate an event plan first before generating a budget',
+    }
+  }
+
+  try {
+    const items = await generateEventBudget(event, plan)
+
+    const supabase = createClient()
+
+    const { error: deleteError } = await supabase
+      .from('budgets')
+      .delete()
+      .eq('event_id', eventId)
+      .eq('ai_generated', true)
+
+    if (deleteError) {
+      return { success: false, error: deleteError.message }
+    }
+
+    const { error: insertError } = await supabase.from('budgets').insert(
+      items.map((item) => ({
+        event_id: eventId,
+        category: item.category,
+        description: item.description,
+        estimated_amount: item.estimated_amount,
+        notes: item.notes,
+        ai_generated: true,
+        status: 'pending' as BudgetStatus,
+      }))
+    )
+
+    if (insertError) {
+      return { success: false, error: insertError.message }
+    }
+
+    return { success: true, eventId }
+  } catch (e) {
+    const message =
+      e instanceof Error ? e.message : 'Budget generation failed unexpectedly.'
+    return { success: false, error: message }
+  }
+}
+
+// ── Checklist generation action ─────────────────────────────────────────────
+
+export type GenerateChecklistResult =
+  | { success: true; eventId: string }
+  | { success: false; error: string }
+
+function offsetDueDate(
+  eventDate: string | null,
+  offsetDays: number
+): string | null {
+  if (!eventDate) return null
+  const [year, month, day] = eventDate.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  date.setUTCDate(date.getUTCDate() - offsetDays)
+  return date.toISOString().split('T')[0]
+}
+
+export async function generateChecklistAction(
+  eventId: string
+): Promise<GenerateChecklistResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner') {
+    return {
+      success: false,
+      error: 'Only planners can generate event checklists',
+    }
+  }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event) {
+    return { success: false, error: 'Event not found' }
+  }
+
+  const plan = await getEventPlan(eventId)
+
+  try {
+    const items = await generateEventChecklist(event, plan)
+
+    const supabase = createClient()
+
+    const { error: deleteError } = await supabase
+      .from('checklists')
+      .delete()
+      .eq('event_id', eventId)
+      .eq('ai_generated', true)
+
+    if (deleteError) {
+      return { success: false, error: deleteError.message }
+    }
+
+    const { error: insertError } = await supabase.from('checklists').insert(
+      items.map((item) => ({
+        event_id: eventId,
+        title: item.title,
+        due_date: offsetDueDate(event.event_date, item.due_date_offset_days),
+        category: item.category,
+        notes: item.notes,
+        ai_generated: true,
+        status: 'todo' as ChecklistStatus,
+      }))
+    )
+
+    if (insertError) {
+      return { success: false, error: insertError.message }
+    }
+
+    return { success: true, eventId }
+  } catch (e) {
+    const message =
+      e instanceof Error
+        ? e.message
+        : 'Checklist generation failed unexpectedly.'
     return { success: false, error: message }
   }
 }

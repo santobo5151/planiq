@@ -16,6 +16,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { GeneratePlanButton } from '@/components/events/generate-plan-button'
+import { getCurrencySymbol } from '@/lib/localisation'
 import type { EventStatus } from '@/types/database'
 
 const STATUS_STYLES: Record<EventStatus, string> = {
@@ -23,44 +24,6 @@ const STATUS_STYLES: Record<EventStatus, string> = {
   active: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-transparent',
   completed:
     'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-transparent',
-}
-
-const NIGERIAN_INDICATORS = [
-  'Lagos',
-  'Abuja',
-  'Port Harcourt',
-  'Victoria Island',
-  'VI',
-  'Lekki',
-  'Ikoyi',
-  'Surulere',
-  'Ikeja',
-  'Warri',
-  'Calabar',
-  'Kano',
-  'Ibadan',
-  'Enugu',
-  'Jos',
-  'Ilorin',
-  'Owerri',
-  'Uyo',
-  'Abeokuta',
-  'Mainland',
-  'Naija',
-  'NG',
-  'Nigeria',
-]
-
-const NIGERIAN_PATTERN = new RegExp(
-  `\\b(${NIGERIAN_INDICATORS.map((s) =>
-    s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
-  ).join('|')})\\b`,
-  'i'
-)
-
-function getCurrencySymbol(location: string | null): string {
-  if (!location) return '£'
-  return NIGERIAN_PATTERN.test(location) ? '₦' : '£'
 }
 
 function formatDate(date: string | null) {
@@ -157,6 +120,18 @@ export default async function EventOverviewPage({
             className={buttonVariants({ variant: 'outline' })}
           >
             Edit
+          </Link>
+          <Link
+            href={`/events/${event.id}/budget`}
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            Budget
+          </Link>
+          <Link
+            href={`/events/${event.id}/checklist`}
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            Checklist
           </Link>
           {hasPlan && (
             <Link

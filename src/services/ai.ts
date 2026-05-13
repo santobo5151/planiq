@@ -1,8 +1,16 @@
 import 'server-only'
 import type Anthropic from '@anthropic-ai/sdk'
 import { anthropic, ANTHROPIC_MODEL } from '@/lib/ai/anthropic'
-import { GeneratedPlanSchema, type GeneratedPlan } from '@/lib/ai/schemas'
-import type { Event as PlanIQEvent } from '@/types/database'
+import {
+  GeneratedPlanSchema,
+  GeneratedBudgetSchema,
+  GeneratedChecklistSchema,
+  type GeneratedPlan,
+  type GeneratedBudget,
+  type GeneratedChecklist,
+} from '@/lib/ai/schemas'
+import { getMarketFromLocation } from '@/lib/localisation'
+import type { Event as PlanIQEvent, EventPlan } from '@/types/database'
 
 const TOOL_NAME = 'submit_event_plan'
 
@@ -235,6 +243,285 @@ export async function generateEventPlan(
   if (!parsed.success) {
     throw new Error(
       `AI response failed schema validation: ${parsed.error.message}`
+    )
+  }
+  return parsed.data
+}
+
+// ── Budget generation ───────────────────────────────────────────────────────
+
+const BUDGET_TOOL_NAME = 'submit_event_budget'
+
+const BUDGET_TOOL_INPUT_SCHEMA: Anthropic.Messages.Tool.InputSchema = {
+  type: 'object',
+  properties: {
+    budget_items: {
+      type: 'array',
+      description: 'At least 3 budget line items covering all major costs.',
+      items: {
+        type: 'object',
+        properties: {
+          category: { type: 'string' },
+          description: { type: 'string' },
+          estimated_amount: {
+            type: 'number',
+            description:
+              'Plain number only — no currency symbols, no commas. E.g. 250000 not ₦250,000.',
+          },
+          notes: { type: 'string' },
+        },
+        required: ['category', 'description', 'estimated_amount', 'notes'],
+      },
+    },
+  },
+  required: ['budget_items'],
+}
+
+function buildBudgetPrompt(event: PlanIQEvent, plan: EventPlan): string {
+  const market = getMarketFromLocation(event.location)
+  const currencyContext =
+    market === 'nigeria'
+      ? 'Nigerian market — use ₦ (Nigerian Naira) and Nigerian market rates'
+      : market === 'uk'
+        ? 'UK market — use £ (British Pounds) and UK market rates'
+        : 'International/USD market — use $ (US Dollars) and international rates'
+
+  const fields: Array<[string, string | number | null | undefined]> = [
+    ['Title', event.title],
+    ['Type', event.event_type],
+    ['Date', event.event_date],
+    ['Location', event.location],
+    ['Guest count', event.guest_count],
+    [
+      'Budget ceiling (interpret in detected local currency)',
+      event.budget_ceiling != null
+        ? event.budget_ceiling.toLocaleString('en-GB')
+        : null,
+    ],
+    ['Theme', event.theme],
+    ['Food preferences', event.food_preferences],
+  ]
+
+  const fieldsBlock = fields
+    .map(
+      ([label, value]) =>
+        `- ${label}: ${value === null || value === undefined || value === '' ? 'Not specified' : value}`
+    )
+    .join('\n')
+
+  const vendorBlock = plan.vendor_categories
+    ? JSON.stringify(plan.vendor_categories, null, 2)
+    : 'Not available'
+
+  return [
+    'You are an experienced event planner. Generate a realistic, itemised budget for the event below.',
+    '',
+    'Event details:',
+    fieldsBlock,
+    '',
+    `Currency context: ${currencyContext}`,
+    '',
+    'Vendor categories from the event plan (use these to guide budget categories):',
+    vendorBlock,
+    '',
+    'Generate at least 3 budget line items that cover all major costs for this event.',
+    'Scale amounts to the budget ceiling if provided.',
+    '',
+    'CRITICAL: estimated_amount MUST be a plain number — no currency symbols, no commas, no text.',
+    'Correct: 250000   Wrong: ₦250,000 or "250,000" or "₦250k"',
+    '',
+    `Submit your result with the ${BUDGET_TOOL_NAME} tool.`,
+  ].join('\n')
+}
+
+export async function generateEventBudget(
+  event: PlanIQEvent,
+  plan: EventPlan
+): Promise<GeneratedBudget> {
+  const response = await anthropic.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 4096,
+    tools: [
+      {
+        name: BUDGET_TOOL_NAME,
+        description: 'Submit the structured budget back to the application.',
+        input_schema: BUDGET_TOOL_INPUT_SCHEMA,
+      },
+    ],
+    tool_choice: { type: 'tool', name: BUDGET_TOOL_NAME },
+    messages: [{ role: 'user', content: buildBudgetPrompt(event, plan) }],
+  })
+
+  let rawInput: unknown
+
+  const toolUse = response.content.find((c) => c.type === 'tool_use')
+  if (toolUse && toolUse.type === 'tool_use') {
+    rawInput = (toolUse.input as Record<string, unknown>)['budget_items']
+  } else {
+    const textBlock = response.content.find((c) => c.type === 'text')
+    if (!textBlock || textBlock.type !== 'text') {
+      throw new Error('AI response contained no tool use or text content.')
+    }
+    const extracted = extractJsonObject(textBlock.text)
+    if (!extracted) {
+      throw new Error('Could not locate a JSON object in the AI response.')
+    }
+    try {
+      const obj = JSON.parse(extracted) as Record<string, unknown>
+      rawInput = obj['budget_items'] ?? obj
+    } catch {
+      throw new Error('Extracted JSON did not parse.')
+    }
+  }
+
+  const parsed = GeneratedBudgetSchema.safeParse(rawInput)
+  if (!parsed.success) {
+    throw new Error(
+      `Budget AI response failed validation: ${parsed.error.message}`
+    )
+  }
+  return parsed.data
+}
+
+// ── Checklist generation ────────────────────────────────────────────────────
+
+const CHECKLIST_TOOL_NAME = 'submit_event_checklist'
+
+const CHECKLIST_TOOL_INPUT_SCHEMA: Anthropic.Messages.Tool.InputSchema = {
+  type: 'object',
+  properties: {
+    checklist_items: {
+      type: 'array',
+      description: 'At least 5 pre-event tasks with realistic due date offsets.',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          due_date_offset_days: {
+            type: 'integer',
+            description:
+              'Number of days before the event this task should be completed. E.g. 180 means 180 days before the event.',
+          },
+          category: { type: 'string' },
+          notes: { type: 'string' },
+        },
+        required: ['title', 'due_date_offset_days', 'category', 'notes'],
+      },
+    },
+  },
+  required: ['checklist_items'],
+}
+
+function buildChecklistPrompt(
+  event: PlanIQEvent,
+  plan?: EventPlan | null
+): string {
+  const market = getMarketFromLocation(event.location)
+  const currencyContext =
+    market === 'nigeria'
+      ? 'Nigerian context — use ₦ and Nigerian vendors/traditions'
+      : market === 'uk'
+        ? 'UK context — use £ and UK supplier norms'
+        : 'International context — use $ and generic planning norms'
+
+  const fields: Array<[string, string | number | null | undefined]> = [
+    ['Title', event.title],
+    ['Type', event.event_type],
+    ['Date', event.event_date],
+    ['Location', event.location],
+    ['Guest count', event.guest_count],
+    ['Theme', event.theme],
+    ['Food preferences', event.food_preferences],
+  ]
+
+  const fieldsBlock = fields
+    .map(
+      ([label, value]) =>
+        `- ${label}: ${value === null || value === undefined || value === '' ? 'Not specified' : value}`
+    )
+    .join('\n')
+
+  const planBlock = plan
+    ? [
+        '',
+        'Timeline from event plan:',
+        JSON.stringify(plan.timeline, null, 2),
+        '',
+        'Vendor categories:',
+        JSON.stringify(plan.vendor_categories, null, 2),
+      ].join('\n')
+    : ''
+
+  return [
+    'You are an experienced event planner. Generate a comprehensive pre-event task checklist for the event below.',
+    '',
+    'Event details:',
+    fieldsBlock,
+    planBlock,
+    '',
+    `Cultural/market context: ${currencyContext}`,
+    '',
+    'Generate at least 5 tasks covering the full planning journey.',
+    'Use realistic due_date_offset_days (days before the event):',
+    '- Venue booking: ~180 days',
+    '- Catering contract: ~120 days',
+    '- Send save-the-dates: ~90 days',
+    '- Finalise guest list: ~60 days',
+    '- Send formal invitations: ~60 days',
+    '- Confirm all vendors: ~30 days',
+    '- Final catering numbers: ~14 days',
+    '- Day-of briefing pack: ~3 days',
+    '',
+    `Submit your result with the ${CHECKLIST_TOOL_NAME} tool.`,
+  ].join('\n')
+}
+
+export async function generateEventChecklist(
+  event: PlanIQEvent,
+  plan?: EventPlan | null
+): Promise<GeneratedChecklist> {
+  const response = await anthropic.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 4096,
+    tools: [
+      {
+        name: CHECKLIST_TOOL_NAME,
+        description: 'Submit the structured checklist back to the application.',
+        input_schema: CHECKLIST_TOOL_INPUT_SCHEMA,
+      },
+    ],
+    tool_choice: { type: 'tool', name: CHECKLIST_TOOL_NAME },
+    messages: [
+      { role: 'user', content: buildChecklistPrompt(event, plan) },
+    ],
+  })
+
+  let rawInput: unknown
+
+  const toolUse = response.content.find((c) => c.type === 'tool_use')
+  if (toolUse && toolUse.type === 'tool_use') {
+    rawInput = (toolUse.input as Record<string, unknown>)['checklist_items']
+  } else {
+    const textBlock = response.content.find((c) => c.type === 'text')
+    if (!textBlock || textBlock.type !== 'text') {
+      throw new Error('AI response contained no tool use or text content.')
+    }
+    const extracted = extractJsonObject(textBlock.text)
+    if (!extracted) {
+      throw new Error('Could not locate a JSON object in the AI response.')
+    }
+    try {
+      const obj = JSON.parse(extracted) as Record<string, unknown>
+      rawInput = obj['checklist_items'] ?? obj
+    } catch {
+      throw new Error('Extracted JSON did not parse.')
+    }
+  }
+
+  const parsed = GeneratedChecklistSchema.safeParse(rawInput)
+  if (!parsed.success) {
+    throw new Error(
+      `Checklist AI response failed validation: ${parsed.error.message}`
     )
   }
   return parsed.data
