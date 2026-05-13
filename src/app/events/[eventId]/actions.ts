@@ -9,7 +9,7 @@ import {
   generateEventChecklist,
 } from '@/services/ai'
 import { ANTHROPIC_MODEL } from '@/lib/ai/anthropic'
-import type { CreateEventInput, BudgetStatus, ChecklistStatus } from '@/types/database'
+import type { CreateEventInput, BudgetStatus, ChecklistStatus, GeneratedPlan } from '@/types/database'
 
 const ALLOWED_STATUSES = ['draft', 'active', 'completed'] as const
 type AllowedStatus = (typeof ALLOWED_STATUSES)[number]
@@ -687,6 +687,106 @@ export async function deleteChecklistItemAction(
 
   if (deleteError) {
     return { success: false, error: deleteError.message }
+  }
+
+  return { success: true }
+}
+
+// ── Plan mutations ───────────────────────────────────────────────────────────
+
+type UpdatePlanInput = {
+  concept_summary?: string
+  timeline?: GeneratedPlan['timeline']
+  vendor_categories?: GeneratedPlan['vendor_categories']
+  recommendations?: GeneratedPlan['recommendations']
+}
+
+export type UpdatePlanResult = { success: true } | { success: false; error: string }
+
+export async function updatePlanAction(
+  eventId: string,
+  data: UpdatePlanInput
+): Promise<UpdatePlanResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner') {
+    return { success: false, error: 'Only planners can edit event plans' }
+  }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event) {
+    return { success: false, error: 'Event not found' }
+  }
+
+  const existingPlan = await getEventPlan(eventId)
+  if (!existingPlan) {
+    return {
+      success: false,
+      error: 'Plan not found. Please generate a plan first.',
+    }
+  }
+
+  if (data.concept_summary !== undefined && !data.concept_summary.trim()) {
+    return { success: false, error: 'Concept summary cannot be empty' }
+  }
+
+  if (data.timeline !== undefined) {
+    for (const item of data.timeline) {
+      if (!item.time?.trim() || !item.activity?.trim()) {
+        return {
+          success: false,
+          error: 'Each timeline item must have a time and activity',
+        }
+      }
+    }
+  }
+
+  if (data.vendor_categories !== undefined) {
+    const validPriorities = ['essential', 'recommended', 'optional']
+    for (const v of data.vendor_categories) {
+      if (!v.name?.trim() || !v.description?.trim()) {
+        return {
+          success: false,
+          error: 'Each vendor category must have a name and description',
+        }
+      }
+      if (!validPriorities.includes(v.priority)) {
+        return { success: false, error: 'Invalid priority value' }
+      }
+    }
+  }
+
+  if (data.recommendations !== undefined) {
+    for (const r of data.recommendations) {
+      if (!r.category?.trim() || !r.suggestion?.trim() || !r.reason?.trim()) {
+        return {
+          success: false,
+          error: 'Each recommendation must have a category, suggestion, and reason',
+        }
+      }
+    }
+  }
+
+  const payload: Record<string, unknown> = {}
+  if (data.concept_summary !== undefined)
+    payload.concept_summary = data.concept_summary.trim()
+  if (data.timeline !== undefined) payload.timeline = data.timeline
+  if (data.vendor_categories !== undefined)
+    payload.vendor_categories = data.vendor_categories
+  if (data.recommendations !== undefined)
+    payload.recommendations = data.recommendations
+
+  if (Object.keys(payload).length === 0) return { success: true }
+
+  const supabase = createClient()
+  const { error: updateError } = await supabase
+    .from('event_plans')
+    .update(payload)
+    .eq('event_id', eventId)
+
+  if (updateError) {
+    return { success: false, error: updateError.message }
   }
 
   return { success: true }

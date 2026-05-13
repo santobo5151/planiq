@@ -568,15 +568,30 @@ export function ChecklistTaskList({
             done: tasks.filter((t) => t.status === 'done').length,
           }
 
+          const catPct =
+            catProgress.total > 0
+              ? Math.round((catProgress.done / catProgress.total) * 100)
+              : 0
+
           return (
             <section key={category}>
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
-                  {category}
-                </h3>
-                <span className="text-xs text-slate-400">
-                  {catProgress.done}/{catProgress.total} done
-                </span>
+              <div className="mb-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
+                    {category}
+                  </h3>
+                  <span className="text-xs text-slate-400">
+                    {catProgress.done}/{catProgress.total} done
+                  </span>
+                </div>
+                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      catPct === 100 ? 'bg-emerald-400' : 'bg-indigo-400'
+                    }`}
+                    style={{ width: `${catPct}%` }}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
