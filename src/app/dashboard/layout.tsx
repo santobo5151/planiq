@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Calendar, LayoutDashboard, Settings, type LucideIcon } from 'lucide-react'
+import { Calendar, LayoutDashboard, Settings, Store, type LucideIcon } from 'lucide-react'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { LogoutButton } from '@/components/dashboard/logout-button'
@@ -8,6 +8,7 @@ import type { Profile } from '@/types/database'
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/events', label: 'Events', icon: Calendar },
+  { href: '/dashboard/vendors', label: 'Vendors', icon: Store },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

@@ -79,6 +79,32 @@ export interface Checklist {
   created_at: string
 }
 
+export type VendorStatus = 'invited' | 'confirmed' | 'declined'
+
+export interface Vendor {
+  id: string
+  planner_id: string
+  name: string
+  category: string
+  email: string | null
+  phone: string | null
+  location: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EventVendor {
+  id: string
+  event_id: string
+  vendor_id: string
+  status: VendorStatus
+  notes: string | null
+  created_at: string
+  updated_at: string
+  vendor?: Vendor
+}
+
 export interface Invite {
   id: string
   event_id: string

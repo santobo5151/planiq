@@ -5,6 +5,7 @@ import {
   MapPin,
   Palette,
   Sparkles,
+  Store,
   Users,
   Utensils,
   Wallet,
@@ -132,6 +133,13 @@ export default async function EventOverviewPage({
             className={buttonVariants({ variant: 'outline' })}
           >
             Checklist
+          </Link>
+          <Link
+            href={`/events/${event.id}/vendors`}
+            className={buttonVariants({ variant: 'outline', className: 'gap-2' })}
+          >
+            <Store className="h-4 w-4" />
+            Vendors
           </Link>
           {hasPlan && (
             <Link
