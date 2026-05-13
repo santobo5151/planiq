@@ -1,6 +1,12 @@
 'use client'
 
-import { useState, useRef, useTransition, type KeyboardEvent } from 'react'
+import {
+  useState,
+  useRef,
+  useEffect,
+  useTransition,
+  type KeyboardEvent,
+} from 'react'
 import { Trash2, Plus, Check, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,6 +27,8 @@ import {
 import { getCurrencySymbol } from '@/lib/localisation'
 import type { Event as PlanIQEvent, Budget, BudgetStatus } from '@/types/database'
 
+// ── Constants ────────────────────────────────────────────────────────────────
+
 const STATUS_CYCLE: Record<BudgetStatus, BudgetStatus> = {
   pending: 'confirmed',
   confirmed: 'paid',
@@ -28,10 +36,184 @@ const STATUS_CYCLE: Record<BudgetStatus, BudgetStatus> = {
 }
 
 const STATUS_STYLES: Record<BudgetStatus, string> = {
-  pending: 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-transparent cursor-pointer',
-  confirmed: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-transparent cursor-pointer',
+  pending:
+    'bg-slate-100 text-slate-700 hover:bg-slate-200 border-transparent cursor-pointer',
+  confirmed:
+    'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-transparent cursor-pointer',
   paid: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-transparent cursor-pointer',
 }
+
+type EditableField =
+  | 'category'
+  | 'description'
+  | 'estimated_amount'
+  | 'actual_amount'
+  | 'notes'
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtAmount(amount: number | null, symbol: string): string {
+  if (amount == null) return '—'
+  return `${symbol}${amount.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`
+}
+
+function fmtVariance(
+  estimated: number | null,
+  actual: number | null,
+  symbol: string
+): { text: string; cls: string } {
+  const est = estimated ?? 0
+  const act = actual ?? 0
+  const v = est - act
+  if (v > 0)
+    return {
+      text: `+${symbol}${v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`,
+      cls: 'text-emerald-600',
+    }
+  if (v < 0)
+    return {
+      text: `-${symbol}${Math.abs(v).toLocaleString('en-GB', { maximumFractionDigits: 0 })}`,
+      cls: 'text-red-600',
+    }
+  return { text: `${symbol}0`, cls: 'text-slate-400' }
+}
+
+// Parse a numeric string. Does NOT strip the minus sign — parseFloat sees it.
+function parseAmount(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const n = parseFloat(trimmed)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+// ── CellInput ────────────────────────────────────────────────────────────────
+// Isolated component: owns its own value state so typing never triggers
+// a parent re-render. Only calls onCommit/onCancel on deliberate action.
+
+interface CellInputProps {
+  initialValue: string
+  inputType?: string
+  error: string | null
+  disabled?: boolean
+  onCommit: (value: string) => void
+  onCancel: () => void
+}
+
+function CellInput({
+  initialValue,
+  inputType = 'text',
+  error,
+  disabled,
+  onCommit,
+  onCancel,
+}: CellInputProps) {
+  const [value, setValue] = useState(initialValue)
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    ref.current?.focus()
+    ref.current?.select()
+  }, [])
+
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      onCommit(value)
+    } else if (e.key === 'Escape') {
+      onCancel()
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1">
+        <Input
+          ref={ref}
+          type={inputType}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="h-7 w-full min-w-[72px] px-2 py-0 text-sm"
+          disabled={disabled}
+        />
+        <button
+          onClick={() => onCommit(value)}
+          disabled={disabled}
+          className="shrink-0 text-emerald-600 hover:text-emerald-700 disabled:opacity-40"
+          title="Save (Enter)"
+        >
+          <Check className="h-4 w-4" />
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={disabled}
+          className="shrink-0 text-slate-400 hover:text-slate-600"
+          title="Cancel (Escape)"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+// ── EditableCell ─────────────────────────────────────────────────────────────
+// Switches between a clickable display cell and an editing cell (CellInput).
+// Defined outside BudgetTable so React never remounts it on parent re-render.
+
+interface EditableCellProps {
+  initialValue: string
+  displayValue: string
+  isEditing: boolean
+  inputType?: string
+  error: string | null
+  disabled?: boolean
+  cellClassName?: string
+  onActivate: () => void
+  onCommit: (value: string) => void
+  onCancel: () => void
+}
+
+function EditableCell({
+  initialValue,
+  displayValue,
+  isEditing,
+  inputType,
+  error,
+  disabled,
+  cellClassName = '',
+  onActivate,
+  onCommit,
+  onCancel,
+}: EditableCellProps) {
+  if (isEditing) {
+    return (
+      <TableCell className={`px-2 py-1 ${cellClassName}`}>
+        <CellInput
+          initialValue={initialValue}
+          inputType={inputType}
+          error={error}
+          disabled={disabled}
+          onCommit={onCommit}
+          onCancel={onCancel}
+        />
+      </TableCell>
+    )
+  }
+
+  return (
+    <TableCell
+      className={`cursor-pointer px-2 py-1 text-sm hover:bg-indigo-50 ${cellClassName}`}
+      onClick={onActivate}
+      title="Click to edit"
+    >
+      <span className="block max-w-[130px] truncate">{displayValue}</span>
+    </TableCell>
+  )
+}
+
+// ── BudgetTable ──────────────────────────────────────────────────────────────
 
 interface Props {
   event: PlanIQEvent
@@ -43,8 +225,7 @@ interface Props {
 
 type EditState = {
   itemId: string
-  field: keyof Budget
-  value: string
+  field: EditableField
   error: string | null
 }
 
@@ -64,16 +245,6 @@ const EMPTY_ADD: AddForm = {
   error: null,
 }
 
-function fmtAmount(amount: number | null, symbol: string): string {
-  if (amount == null) return '—'
-  return `${symbol}${amount.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`
-}
-
-function parseAmount(raw: string): number | null {
-  const n = parseFloat(raw.replace(/[^0-9.]/g, ''))
-  return Number.isFinite(n) && n >= 0 ? n : null
-}
-
 export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) {
   const symbol = getCurrencySymbol(event.location)
   const [edit, setEdit] = useState<EditState | null>(null)
@@ -83,51 +254,35 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const [savePending, startSaveTransition] = useTransition()
   const [addPending, startAddTransition] = useTransition()
-  const inputRef = useRef<HTMLInputElement>(null)
 
-  // ── Inline cell editing ─────────────────────────────────────────────────
+  // ── Inline editing ─────────────────────────────────────────────────────────
 
-  function startEdit(item: Budget, field: keyof Budget) {
-    const raw = item[field]
-    const value =
-      field === 'estimated_amount' || field === 'actual_amount'
-        ? raw == null ? '' : String(raw)
-        : raw == null ? '' : String(raw)
-    setEdit({ itemId: item.id, field, value, error: null })
-    setTimeout(() => inputRef.current?.select(), 0)
+  function startEdit(itemId: string, field: EditableField) {
+    setEdit({ itemId, field, error: null })
   }
 
   function cancelEdit() {
     setEdit(null)
   }
 
-  function commitEdit(item: Budget) {
-    if (!edit || edit.itemId !== item.id) return
-
-    const field = edit.field as
-      | 'category'
-      | 'description'
-      | 'estimated_amount'
-      | 'actual_amount'
-      | 'notes'
-
+  function commitEdit(item: Budget, field: EditableField, value: string) {
     let updateData: Parameters<typeof updateBudgetItemAction>[1] = {}
 
     if (field === 'estimated_amount' || field === 'actual_amount') {
-      const parsed = parseAmount(edit.value)
+      const parsed = parseAmount(value)
       if (parsed === null) {
         setEdit((e) => e && { ...e, error: 'Enter a number ≥ 0' })
         return
       }
       updateData = { [field]: parsed }
     } else if (field === 'category') {
-      if (!edit.value.trim()) {
+      if (!value.trim()) {
         setEdit((e) => e && { ...e, error: 'Category cannot be empty' })
         return
       }
-      updateData = { category: edit.value.trim() }
+      updateData = { category: value.trim() }
     } else {
-      updateData = { [field]: edit.value }
+      updateData = { [field]: value }
     }
 
     startSaveTransition(async () => {
@@ -136,8 +291,11 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
         const updated: Budget = {
           ...item,
           ...(field === 'estimated_amount' || field === 'actual_amount'
-            ? { [field]: parseAmount(edit.value) }
-            : { [field]: field === 'category' ? edit.value.trim() : edit.value }),
+            ? { [field]: parseAmount(value) }
+            : {
+                [field]:
+                  field === 'category' ? value.trim() : value,
+              }),
         }
         onUpdate(updated)
         setEdit(null)
@@ -147,38 +305,31 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
     })
   }
 
-  function onKeyDown(e: KeyboardEvent<HTMLInputElement>, item: Budget) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      commitEdit(item)
-    } else if (e.key === 'Escape') {
-      cancelEdit()
-    }
+  function isActiveField(itemId: string, field: EditableField) {
+    return edit?.itemId === itemId && edit.field === field
   }
 
-  // ── Status cycling (optimistic) ─────────────────────────────────────────
+  function editError(itemId: string, field: EditableField): string | null {
+    return isActiveField(itemId, field) ? (edit?.error ?? null) : null
+  }
+
+  function initialFor(item: Budget, field: EditableField): string {
+    const raw = item[field]
+    return raw == null ? '' : String(raw)
+  }
+
+  // ── Status cycling (optimistic) ────────────────────────────────────────────
 
   function cycleStatus(item: Budget) {
     const next = STATUS_CYCLE[item.status]
-    const optimistic: Budget = { ...item, status: next }
-    onUpdate(optimistic)
+    onUpdate({ ...item, status: next })
     startSaveTransition(async () => {
       const result = await updateBudgetItemAction(item.id, { status: next })
-      if (!result.success) {
-        onUpdate(item) // rollback
-      }
+      if (!result.success) onUpdate(item) // rollback
     })
   }
 
-  // ── Delete ───────────────────────────────────────────────────────────────
-
-  function confirmDelete(id: string) {
-    setPendingDelete(id)
-  }
-
-  function cancelDelete() {
-    setPendingDelete(null)
-  }
+  // ── Delete ─────────────────────────────────────────────────────────────────
 
   function executeDelete(id: string) {
     setPendingDelete(null)
@@ -186,16 +337,13 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
     startSaveTransition(async () => {
       const result = await deleteBudgetItemAction(id)
       setDeletingId(null)
-      if (result.success) {
-        onDelete(id)
-      }
+      if (result.success) onDelete(id)
     })
   }
 
-  // ── Add form ─────────────────────────────────────────────────────────────
+  // ── Add form ───────────────────────────────────────────────────────────────
 
   function submitAdd() {
-    const amount = parseAmount(addForm.estimated_amount)
     if (!addForm.category.trim()) {
       setAddForm((f) => ({ ...f, error: 'Category is required' }))
       return
@@ -204,6 +352,7 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
       setAddForm((f) => ({ ...f, error: 'Description is required' }))
       return
     }
+    const amount = parseAmount(addForm.estimated_amount)
     if (amount === null) {
       setAddForm((f) => ({ ...f, error: 'Enter a valid amount ≥ 0' }))
       return
@@ -217,7 +366,7 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
         notes: addForm.notes.trim() || undefined,
       })
       if (result.success) {
-        const newItem: Budget = {
+        onAdd({
           id: result.budgetItemId,
           event_id: event.id,
           category: addForm.category.trim(),
@@ -229,8 +378,7 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
           ai_generated: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        }
-        onAdd(newItem)
+        })
         setAddForm(EMPTY_ADD)
         setShowAdd(false)
       } else {
@@ -239,74 +387,7 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
     })
   }
 
-  // ── Cell renderer ────────────────────────────────────────────────────────
-
-  function EditableCell({
-    item,
-    field,
-    display,
-    className = '',
-    inputType = 'text',
-  }: {
-    item: Budget
-    field: keyof Budget
-    display: string
-    className?: string
-    inputType?: string
-  }) {
-    const isEditing = edit?.itemId === item.id && edit.field === field
-
-    if (isEditing) {
-      return (
-        <TableCell className={`px-2 py-1 ${className}`}>
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1">
-              <Input
-                ref={inputRef}
-                type={inputType}
-                value={edit.value}
-                onChange={(e) =>
-                  setEdit((s) => s && { ...s, value: e.target.value, error: null })
-                }
-                onKeyDown={(e) => onKeyDown(e, item)}
-                className="h-7 w-full min-w-[80px] px-2 py-0 text-sm"
-                disabled={savePending}
-              />
-              <button
-                onClick={() => commitEdit(item)}
-                disabled={savePending}
-                className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
-                title="Save (Enter)"
-              >
-                <Check className="h-4 w-4" />
-              </button>
-              <button
-                onClick={cancelEdit}
-                disabled={savePending}
-                className="text-slate-400 hover:text-slate-600"
-                title="Cancel (Escape)"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            {edit.error && (
-              <p className="text-xs text-red-600">{edit.error}</p>
-            )}
-          </div>
-        </TableCell>
-      )
-    }
-
-    return (
-      <TableCell
-        className={`cursor-pointer px-2 py-1 text-sm hover:bg-indigo-50 ${className}`}
-        onClick={() => startEdit(item, field)}
-        title="Click to edit"
-      >
-        <span className="block max-w-[160px] truncate">{display}</span>
-      </TableCell>
-    )
-  }
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-3">
@@ -326,6 +407,9 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
               <TableHead className="px-2 py-2 text-right text-xs font-semibold text-slate-700">
                 Actual
               </TableHead>
+              <TableHead className="px-2 py-2 text-right text-xs font-semibold text-slate-700">
+                Variance
+              </TableHead>
               <TableHead className="px-2 py-2 text-xs font-semibold text-slate-700">
                 Notes
               </TableHead>
@@ -336,88 +420,126 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((item) => (
-              <TableRow
-                key={item.id}
-                className={
-                  deletingId === item.id
-                    ? 'opacity-40'
-                    : item.ai_generated
-                      ? ''
-                      : 'bg-amber-50/40'
-                }
-              >
-                <EditableCell
-                  item={item}
-                  field="category"
-                  display={item.category}
-                  className="font-medium text-slate-900"
-                />
-                <EditableCell
-                  item={item}
-                  field="description"
-                  display={item.description ?? '—'}
-                  className="text-slate-600"
-                />
-                <EditableCell
-                  item={item}
-                  field="estimated_amount"
-                  display={fmtAmount(item.estimated_amount, symbol)}
-                  className="text-right tabular-nums text-slate-900"
-                  inputType="number"
-                />
-                <EditableCell
-                  item={item}
-                  field="actual_amount"
-                  display={fmtAmount(item.actual_amount, symbol)}
-                  className="text-right tabular-nums text-slate-600"
-                  inputType="number"
-                />
-                <EditableCell
-                  item={item}
-                  field="notes"
-                  display={item.notes ?? '—'}
-                  className="text-slate-600"
-                />
-                <TableCell className="px-2 py-1">
-                  {pendingDelete === item.id ? (
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-slate-600">Delete?</span>
-                      <button
-                        onClick={() => executeDelete(item.id)}
-                        className="text-xs font-medium text-red-600 hover:underline"
-                      >
-                        Yes
-                      </button>
-                      <button
-                        onClick={cancelDelete}
-                        className="text-xs text-slate-500 hover:underline"
-                      >
-                        No
-                      </button>
-                    </div>
-                  ) : (
-                    <Badge
-                      className={STATUS_STYLES[item.status]}
-                      onClick={() => cycleStatus(item)}
-                      title="Click to cycle status"
-                    >
-                      {item.status}
-                    </Badge>
-                  )}
-                </TableCell>
-                <TableCell className="px-2 py-1">
-                  <button
-                    onClick={() => confirmDelete(item.id)}
-                    disabled={deletingId === item.id}
-                    className="text-slate-300 hover:text-red-500 disabled:opacity-30"
-                    title="Delete row"
+            {items.map((item) => {
+              const variance = fmtVariance(
+                item.estimated_amount,
+                item.actual_amount,
+                symbol
+              )
+              return (
+                <TableRow
+                  key={item.id}
+                  className={
+                    deletingId === item.id
+                      ? 'opacity-40'
+                      : item.ai_generated
+                        ? ''
+                        : 'bg-amber-50/40'
+                  }
+                >
+                  <EditableCell
+                    initialValue={initialFor(item, 'category')}
+                    displayValue={item.category}
+                    isEditing={isActiveField(item.id, 'category')}
+                    error={editError(item.id, 'category')}
+                    disabled={savePending}
+                    cellClassName="font-medium text-slate-900"
+                    onActivate={() => startEdit(item.id, 'category')}
+                    onCommit={(v) => commitEdit(item, 'category', v)}
+                    onCancel={cancelEdit}
+                  />
+                  <EditableCell
+                    initialValue={initialFor(item, 'description')}
+                    displayValue={item.description ?? '—'}
+                    isEditing={isActiveField(item.id, 'description')}
+                    error={editError(item.id, 'description')}
+                    disabled={savePending}
+                    cellClassName="text-slate-600"
+                    onActivate={() => startEdit(item.id, 'description')}
+                    onCommit={(v) => commitEdit(item, 'description', v)}
+                    onCancel={cancelEdit}
+                  />
+                  <EditableCell
+                    initialValue={initialFor(item, 'estimated_amount')}
+                    displayValue={fmtAmount(item.estimated_amount, symbol)}
+                    isEditing={isActiveField(item.id, 'estimated_amount')}
+                    inputType="number"
+                    error={editError(item.id, 'estimated_amount')}
+                    disabled={savePending}
+                    cellClassName="text-right tabular-nums text-slate-900"
+                    onActivate={() => startEdit(item.id, 'estimated_amount')}
+                    onCommit={(v) => commitEdit(item, 'estimated_amount', v)}
+                    onCancel={cancelEdit}
+                  />
+                  <EditableCell
+                    initialValue={initialFor(item, 'actual_amount')}
+                    displayValue={fmtAmount(item.actual_amount, symbol)}
+                    isEditing={isActiveField(item.id, 'actual_amount')}
+                    inputType="number"
+                    error={editError(item.id, 'actual_amount')}
+                    disabled={savePending}
+                    cellClassName="text-right tabular-nums text-slate-600"
+                    onActivate={() => startEdit(item.id, 'actual_amount')}
+                    onCommit={(v) => commitEdit(item, 'actual_amount', v)}
+                    onCancel={cancelEdit}
+                  />
+                  {/* Variance — read-only */}
+                  <TableCell
+                    className={`px-2 py-1 text-right text-sm tabular-nums font-medium ${variance.cls}`}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </TableCell>
-              </TableRow>
-            ))}
+                    {variance.text}
+                  </TableCell>
+                  <EditableCell
+                    initialValue={initialFor(item, 'notes')}
+                    displayValue={item.notes ?? '—'}
+                    isEditing={isActiveField(item.id, 'notes')}
+                    error={editError(item.id, 'notes')}
+                    disabled={savePending}
+                    cellClassName="text-slate-600"
+                    onActivate={() => startEdit(item.id, 'notes')}
+                    onCommit={(v) => commitEdit(item, 'notes', v)}
+                    onCancel={cancelEdit}
+                  />
+                  <TableCell className="px-2 py-1">
+                    {pendingDelete === item.id ? (
+                      <div className="flex items-center gap-1 whitespace-nowrap">
+                        <span className="text-xs text-slate-600">Delete?</span>
+                        <button
+                          onClick={() => executeDelete(item.id)}
+                          className="text-xs font-medium text-red-600 hover:underline"
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={() => setPendingDelete(null)}
+                          className="text-xs text-slate-500 hover:underline"
+                        >
+                          No
+                        </button>
+                      </div>
+                    ) : (
+                      <Badge
+                        className={STATUS_STYLES[item.status]}
+                        onClick={() => cycleStatus(item)}
+                        title="Click to cycle status"
+                      >
+                        {item.status}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    <button
+                      onClick={() => setPendingDelete(item.id)}
+                      disabled={deletingId === item.id}
+                      className="text-slate-300 hover:text-red-500 disabled:opacity-30"
+                      title="Delete row"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
           </TableBody>
         </Table>
       </div>
@@ -435,7 +557,11 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
               <Input
                 value={addForm.category}
                 onChange={(e) =>
-                  setAddForm((f) => ({ ...f, category: e.target.value, error: null }))
+                  setAddForm((f) => ({
+                    ...f,
+                    category: e.target.value,
+                    error: null,
+                  }))
                 }
                 placeholder="e.g. Catering"
                 className="h-8 text-sm"
