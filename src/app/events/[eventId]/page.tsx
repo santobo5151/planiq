@@ -147,6 +147,7 @@ export default async function EventOverviewPage({
           <GeneratePlanButton
             eventId={event.id}
             mode={hasPlan ? 'regenerate' : 'generate'}
+            hasPlan={hasPlan}
           />
         </div>
       </div>

@@ -194,7 +194,7 @@ function PlanSections({
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <BudgetGenerateButton eventId={eventId} />
-        <GeneratePlanButton eventId={eventId} mode="regenerate" />
+        <GeneratePlanButton eventId={eventId} mode="regenerate" hasPlan={true} />
       </div>
     </div>
   )
