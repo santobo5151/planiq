@@ -3,10 +3,8 @@ import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth'
 import { getEventById, getBudget } from '@/services/events'
 import { Card, CardContent } from '@/components/ui/card'
-import { buttonVariants } from '@/components/ui/button'
 import { BudgetGenerateButton } from '@/components/events/budget-generate-button'
-import { BudgetSummary } from '@/components/events/budget-summary'
-import { BudgetTable } from '@/components/events/budget-table'
+import { BudgetManager } from '@/components/events/budget-manager'
 
 export default async function BudgetPage({
   params,
@@ -51,15 +49,14 @@ export default async function BudgetPage({
                 itemised budget broken down by vendor category — including
                 estimated costs calibrated to your location and scale.
               </p>
-              <BudgetGenerateButton eventId={event.id} />
+              <BudgetGenerateButton eventId={event.id} hasBudget={false} />
             </CardContent>
           </Card>
         ) : (
           <div className="mt-8 space-y-8">
-            <BudgetSummary event={event} items={items} />
-            <BudgetTable event={event} items={items} />
+            <BudgetManager event={event} initialBudgetItems={items} />
             <div className="flex justify-end">
-              <BudgetGenerateButton eventId={event.id} />
+              <BudgetGenerateButton eventId={event.id} hasBudget={true} />
             </div>
           </div>
         )}

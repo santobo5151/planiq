@@ -341,6 +341,7 @@ export async function generateEventBudget(
   const response = await anthropic.messages.create({
     model: ANTHROPIC_MODEL,
     max_tokens: 4096,
+    temperature: 0.2,
     tools: [
       {
         name: BUDGET_TOOL_NAME,
@@ -483,6 +484,7 @@ export async function generateEventChecklist(
   const response = await anthropic.messages.create({
     model: ANTHROPIC_MODEL,
     max_tokens: 4096,
+    temperature: 0.2,
     tools: [
       {
         name: CHECKLIST_TOOL_NAME,

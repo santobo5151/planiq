@@ -320,3 +320,192 @@ export async function generateChecklistAction(
     return { success: false, error: message }
   }
 }
+
+// ── Budget item mutations ────────────────────────────────────────────────────
+
+const VALID_BUDGET_STATUSES = ['pending', 'confirmed', 'paid'] as const
+
+export type UpdateBudgetItemResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function updateBudgetItemAction(
+  budgetItemId: string,
+  data: {
+    category?: string
+    description?: string
+    estimated_amount?: number
+    actual_amount?: number
+    notes?: string
+    status?: BudgetStatus
+  }
+): Promise<UpdateBudgetItemResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner') {
+    return { success: false, error: 'Only planners can edit budget items' }
+  }
+
+  const supabase = createClient()
+
+  const { data: row, error: fetchError } = await supabase
+    .from('budgets')
+    .select('event_id')
+    .eq('id', budgetItemId)
+    .maybeSingle()
+
+  if (fetchError || !row) {
+    return { success: false, error: 'Budget item not found' }
+  }
+
+  const event = await getEventById(row.event_id as string, user.id)
+  if (!event) {
+    return { success: false, error: 'Event not found or access denied' }
+  }
+
+  if (data.category !== undefined && data.category.trim() === '') {
+    return { success: false, error: 'Category cannot be empty' }
+  }
+  if (
+    data.estimated_amount !== undefined &&
+    (!Number.isFinite(data.estimated_amount) || data.estimated_amount < 0)
+  ) {
+    return { success: false, error: 'Estimated amount must be 0 or greater' }
+  }
+  if (
+    data.actual_amount !== undefined &&
+    (!Number.isFinite(data.actual_amount) || data.actual_amount < 0)
+  ) {
+    return { success: false, error: 'Actual amount must be 0 or greater' }
+  }
+  if (
+    data.status !== undefined &&
+    !VALID_BUDGET_STATUSES.includes(data.status)
+  ) {
+    return { success: false, error: 'Invalid status value' }
+  }
+
+  const payload: Record<string, unknown> = {}
+  if (data.category !== undefined) payload.category = data.category.trim()
+  if (data.description !== undefined) payload.description = data.description
+  if (data.estimated_amount !== undefined) payload.estimated_amount = data.estimated_amount
+  if (data.actual_amount !== undefined) payload.actual_amount = data.actual_amount
+  if (data.notes !== undefined) payload.notes = data.notes
+  if (data.status !== undefined) payload.status = data.status
+
+  if (Object.keys(payload).length === 0) return { success: true }
+
+  const { error: updateError } = await supabase
+    .from('budgets')
+    .update(payload)
+    .eq('id', budgetItemId)
+
+  if (updateError) {
+    return { success: false, error: updateError.message }
+  }
+
+  return { success: true }
+}
+
+export type AddBudgetItemResult =
+  | { success: true; budgetItemId: string }
+  | { success: false; error: string }
+
+export async function addBudgetItemAction(
+  eventId: string,
+  data: {
+    category: string
+    description: string
+    estimated_amount: number
+    notes?: string
+  }
+): Promise<AddBudgetItemResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner') {
+    return { success: false, error: 'Only planners can add budget items' }
+  }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event) {
+    return { success: false, error: 'Event not found' }
+  }
+
+  if (!data.category.trim()) {
+    return { success: false, error: 'Category cannot be empty' }
+  }
+  if (!data.description.trim()) {
+    return { success: false, error: 'Description cannot be empty' }
+  }
+  if (!Number.isFinite(data.estimated_amount) || data.estimated_amount < 0) {
+    return { success: false, error: 'Estimated amount must be 0 or greater' }
+  }
+
+  const supabase = createClient()
+
+  const { data: newItem, error: insertError } = await supabase
+    .from('budgets')
+    .insert({
+      event_id: eventId,
+      category: data.category.trim(),
+      description: data.description.trim(),
+      estimated_amount: data.estimated_amount,
+      actual_amount: 0,
+      notes: data.notes ?? null,
+      ai_generated: false,
+      status: 'pending' as BudgetStatus,
+    })
+    .select('id')
+    .single()
+
+  if (insertError || !newItem) {
+    return { success: false, error: insertError?.message ?? 'Insert failed' }
+  }
+
+  return { success: true, budgetItemId: newItem.id as string }
+}
+
+export type DeleteBudgetItemResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function deleteBudgetItemAction(
+  budgetItemId: string
+): Promise<DeleteBudgetItemResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner') {
+    return { success: false, error: 'Only planners can delete budget items' }
+  }
+
+  const supabase = createClient()
+
+  const { data: row, error: fetchError } = await supabase
+    .from('budgets')
+    .select('event_id')
+    .eq('id', budgetItemId)
+    .maybeSingle()
+
+  if (fetchError || !row) {
+    return { success: false, error: 'Budget item not found' }
+  }
+
+  const event = await getEventById(row.event_id as string, user.id)
+  if (!event) {
+    return { success: false, error: 'Event not found or access denied' }
+  }
+
+  const { error: deleteError } = await supabase
+    .from('budgets')
+    .delete()
+    .eq('id', budgetItemId)
+
+  if (deleteError) {
+    return { success: false, error: deleteError.message }
+  }
+
+  return { success: true }
+}
