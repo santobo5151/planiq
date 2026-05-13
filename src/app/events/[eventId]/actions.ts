@@ -509,3 +509,185 @@ export async function deleteBudgetItemAction(
 
   return { success: true }
 }
+
+// ── Checklist item mutations ─────────────────────────────────────────────────
+
+const VALID_CHECKLIST_STATUSES = ['todo', 'in_progress', 'done'] as const
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+function isValidISODate(s: string): boolean {
+  return ISO_DATE_RE.test(s) && !isNaN(Date.parse(s))
+}
+
+export type UpdateChecklistItemResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function updateChecklistItemAction(
+  checklistItemId: string,
+  data: {
+    status?: ChecklistStatus
+    title?: string
+    category?: string
+    due_date?: string | null
+    notes?: string
+  }
+): Promise<UpdateChecklistItemResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner') {
+    return { success: false, error: 'Only planners can edit checklist items' }
+  }
+
+  const supabase = createClient()
+
+  const { data: row, error: fetchError } = await supabase
+    .from('checklists')
+    .select('event_id')
+    .eq('id', checklistItemId)
+    .maybeSingle()
+
+  if (fetchError || !row) {
+    return { success: false, error: 'Checklist item not found' }
+  }
+
+  const event = await getEventById(row.event_id as string, user.id)
+  if (!event) {
+    return { success: false, error: 'Event not found or access denied' }
+  }
+
+  if (data.status !== undefined && !VALID_CHECKLIST_STATUSES.includes(data.status)) {
+    return { success: false, error: 'Invalid status value' }
+  }
+  if (data.title !== undefined && !data.title.trim()) {
+    return { success: false, error: 'Title cannot be empty' }
+  }
+  if (data.category !== undefined && !data.category.trim()) {
+    return { success: false, error: 'Category cannot be empty' }
+  }
+  if (data.due_date !== undefined && data.due_date !== null && !isValidISODate(data.due_date)) {
+    return { success: false, error: 'Due date must be in YYYY-MM-DD format' }
+  }
+
+  const payload: Record<string, unknown> = {}
+  if (data.status !== undefined) payload.status = data.status
+  if (data.title !== undefined) payload.title = data.title.trim()
+  if (data.category !== undefined) payload.category = data.category.trim()
+  if (data.due_date !== undefined) payload.due_date = data.due_date
+  if (data.notes !== undefined) payload.notes = data.notes
+
+  if (Object.keys(payload).length === 0) return { success: true }
+
+  const { error: updateError } = await supabase
+    .from('checklists')
+    .update(payload)
+    .eq('id', checklistItemId)
+
+  if (updateError) {
+    return { success: false, error: updateError.message }
+  }
+
+  return { success: true }
+}
+
+export type AddChecklistItemResult =
+  | { success: true; checklistItemId: string }
+  | { success: false; error: string }
+
+export async function addChecklistItemAction(
+  eventId: string,
+  data: {
+    title: string
+    category: string
+    due_date?: string | null
+    notes?: string
+  }
+): Promise<AddChecklistItemResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner') {
+    return { success: false, error: 'Only planners can add checklist items' }
+  }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event) {
+    return { success: false, error: 'Event not found' }
+  }
+
+  if (!data.title.trim()) {
+    return { success: false, error: 'Title cannot be empty' }
+  }
+  if (!data.category.trim()) {
+    return { success: false, error: 'Category cannot be empty' }
+  }
+  if (data.due_date && !isValidISODate(data.due_date)) {
+    return { success: false, error: 'Due date must be in YYYY-MM-DD format' }
+  }
+
+  const supabase = createClient()
+
+  const { data: newItem, error: insertError } = await supabase
+    .from('checklists')
+    .insert({
+      event_id: eventId,
+      title: data.title.trim(),
+      category: data.category.trim(),
+      due_date: data.due_date ?? null,
+      notes: data.notes ?? null,
+      ai_generated: false,
+      status: 'todo' as ChecklistStatus,
+    })
+    .select('id')
+    .single()
+
+  if (insertError || !newItem) {
+    return { success: false, error: insertError?.message ?? 'Insert failed' }
+  }
+
+  return { success: true, checklistItemId: newItem.id as string }
+}
+
+export type DeleteChecklistItemResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function deleteChecklistItemAction(
+  checklistItemId: string
+): Promise<DeleteChecklistItemResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner') {
+    return { success: false, error: 'Only planners can delete checklist items' }
+  }
+
+  const supabase = createClient()
+
+  const { data: row, error: fetchError } = await supabase
+    .from('checklists')
+    .select('event_id')
+    .eq('id', checklistItemId)
+    .maybeSingle()
+
+  if (fetchError || !row) {
+    return { success: false, error: 'Checklist item not found' }
+  }
+
+  const event = await getEventById(row.event_id as string, user.id)
+  if (!event) {
+    return { success: false, error: 'Event not found or access denied' }
+  }
+
+  const { error: deleteError } = await supabase
+    .from('checklists')
+    .delete()
+    .eq('id', checklistItemId)
+
+  if (deleteError) {
+    return { success: false, error: deleteError.message }
+  }
+
+  return { success: true }
+}
