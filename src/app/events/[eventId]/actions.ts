@@ -11,6 +11,8 @@ import {
 import { ANTHROPIC_MODEL } from '@/lib/ai/anthropic'
 import { createOrReuseInvite } from '@/services/invites'
 import { sendEmail } from '@/lib/email/resend'
+import { getMarketFromLocation } from '@/lib/localisation'
+import { dateStringToEndOfDayISO } from '@/lib/rsvp-deadline'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import type { CreateEventInput, BudgetStatus, ChecklistStatus, GeneratedPlan, Guest, GuestRsvpStatus } from '@/types/database'
@@ -911,6 +913,7 @@ export async function createGuestAction(
     last_name: string
     email?: string | null
     rsvp_status?: GuestRsvpStatus
+    plus_one_allowed?: boolean
     plus_one?: boolean
     dietary_notes?: string | null
   }
@@ -946,12 +949,13 @@ export async function createGuestAction(
 
   const dietaryRaw = (input.dietary_notes ?? '').trim()
   const dietary_notes = dietaryRaw || null
+  const plus_one_allowed = input.plus_one_allowed ?? false
   const plus_one = input.plus_one ?? false
 
   const supabase = createClient()
   const { data: inserted, error: insertError } = await supabase
     .from('guests')
-    .insert({ event_id: eventId, first_name, last_name, email, rsvp_status, plus_one, dietary_notes })
+    .insert({ event_id: eventId, first_name, last_name, email, rsvp_status, plus_one_allowed, plus_one, dietary_notes })
     .select('*')
     .single()
 
@@ -974,6 +978,7 @@ export async function updateGuestAction(
     last_name: string
     email: string | null
     rsvp_status: GuestRsvpStatus
+    plus_one_allowed: boolean
     plus_one: boolean
     dietary_notes: string | null
   }>
@@ -1032,6 +1037,10 @@ export async function updateGuestAction(
     updatePayload.rsvp_status = patch.rsvp_status
     if (patch.rsvp_status === 'declined' && patch.plus_one === undefined)
       updatePayload.plus_one = false
+  }
+
+  if (patch.plus_one_allowed !== undefined) {
+    updatePayload.plus_one_allowed = patch.plus_one_allowed
   }
 
   if (patch.plus_one !== undefined) {
@@ -1096,5 +1105,379 @@ export async function deleteGuestAction(
   revalidatePath(`/events/${eventId}/guests`)
   revalidatePath(`/events/${eventId}`)
 
+  return { success: true }
+}
+
+// ── RSVP email helper ─────────────────────────────────────────────────────────
+
+function buildRsvpEmailHtml(
+  guestFirstName: string,
+  eventTitle: string,
+  eventDate: string | null,
+  deadlineDisplay: string | null,
+  rsvpUrl: string
+): string {
+  const formattedDate = eventDate
+    ? new Date(eventDate).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : null
+
+  const eventLine = formattedDate
+    ? `You're invited to <strong>${eventTitle}</strong> on ${formattedDate}.`
+    : `You're invited to <strong>${eventTitle}</strong>.`
+
+  const deadlineLine = deadlineDisplay
+    ? `<p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Please respond by <strong>${deadlineDisplay}</strong>.</p>`
+    : ''
+
+  return `<!DOCTYPE html>
+<html>
+<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:20px;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <h1 style="margin:0 0 24px;font-size:22px;color:#4f46e5;">PlanIQ</h1>
+    <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Hi ${guestFirstName},</p>
+    <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">${eventLine}</p>
+    ${deadlineLine}
+    <div style="text-align:center;margin:0 0 28px;">
+      <a href="${rsvpUrl}"
+         style="background-color:#4f46e5;color:#fff;padding:14px 32px;text-decoration:none;border-radius:6px;font-size:16px;font-weight:600;display:inline-block;">
+        RSVP now
+      </a>
+    </div>
+    <p style="font-size:13px;color:#64748b;margin:0;line-height:1.6;">
+      This RSVP link remains available, but responses may close after the RSVP deadline set by
+      your planner. You can update your response any time before then.
+    </p>
+  </div>
+</body>
+</html>`
+}
+
+// ── RSVP deadline action ──────────────────────────────────────────────────────
+
+export type SetRsvpDeadlineResult = { success: true } | { success: false; error: string }
+
+export async function setRsvpDeadlineAction(
+  eventId: string,
+  dateString: string | null
+): Promise<SetRsvpDeadlineResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile?.role) return { success: false, error: 'Please complete onboarding first' }
+  if (profile.role !== 'planner') return { success: false, error: 'Only planners can do this' }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event || (event.created_by !== user.id && event.planner_id !== user.id))
+    return { success: false, error: 'Event not found' }
+
+  const supabase = createClient()
+
+  if (!dateString || dateString.trim() === '') {
+    await supabase.from('events').update({ rsvp_deadline: null }).eq('id', eventId)
+    revalidatePath(`/events/${eventId}`)
+    revalidatePath(`/events/${eventId}/guests`)
+    return { success: true }
+  }
+
+  const ds = dateString.trim()
+  if (!isValidISODate(ds)) return { success: false, error: 'Please enter a valid date' }
+
+  const market = getMarketFromLocation(event.location)
+  const isoDeadline = dateStringToEndOfDayISO(ds, market)
+
+  if (new Date() > new Date(isoDeadline))
+    return { success: false, error: 'RSVP deadline must be in the future' }
+
+  const { error: updateError } = await supabase
+    .from('events')
+    .update({ rsvp_deadline: isoDeadline })
+    .eq('id', eventId)
+
+  if (updateError) return { success: false, error: updateError.message }
+
+  revalidatePath(`/events/${eventId}`)
+  revalidatePath(`/events/${eventId}/guests`)
+  return { success: true }
+}
+
+// ── Toggle plus_one_allowed ───────────────────────────────────────────────────
+
+export type TogglePlusOneAllowedResult = { success: true } | { success: false; error: string }
+
+export async function togglePlusOneAllowedAction(
+  eventId: string,
+  guestId: string,
+  allowed: boolean
+): Promise<TogglePlusOneAllowedResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile?.role) return { success: false, error: 'Please complete onboarding first' }
+  if (profile.role !== 'planner') return { success: false, error: 'Only planners can do this' }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event || (event.created_by !== user.id && event.planner_id !== user.id))
+    return { success: false, error: 'Event not found' }
+
+  const supabase = createClient()
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('guests')
+    .select('event_id')
+    .eq('id', guestId)
+    .maybeSingle()
+
+  if (fetchError || !existing) return { success: false, error: 'Guest not found' }
+  if ((existing as { event_id: string }).event_id !== eventId)
+    return { success: false, error: 'Guest not found' }
+
+  const { error: updateError } = await supabase
+    .from('guests')
+    .update({ plus_one_allowed: allowed })
+    .eq('id', guestId)
+
+  if (updateError) return { success: false, error: updateError.message }
+
+  revalidatePath(`/events/${eventId}/guests`)
+  return { success: true }
+}
+
+// ── Send single RSVP invite ───────────────────────────────────────────────────
+
+export type SendRsvpInviteResult = { success: true } | { success: false; error: string }
+
+export async function sendRsvpInviteAction(
+  eventId: string,
+  guestId: string
+): Promise<SendRsvpInviteResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile?.role) return { success: false, error: 'Please complete onboarding first' }
+  if (profile.role !== 'planner') return { success: false, error: 'Only planners can do this' }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event || (event.created_by !== user.id && event.planner_id !== user.id))
+    return { success: false, error: 'Event not found' }
+
+  const supabase = createClient()
+
+  const { data: guestRow, error: fetchError } = await supabase
+    .from('guests')
+    .select('*')
+    .eq('id', guestId)
+    .maybeSingle()
+
+  if (fetchError || !guestRow) return { success: false, error: 'Guest not found' }
+  if ((guestRow as { event_id: string }).event_id !== eventId)
+    return { success: false, error: 'Guest not found' }
+
+  const guest = guestRow as Guest
+
+  const emailRaw = (guest.email ?? '').trim()
+  if (!emailRaw)
+    return {
+      success: false,
+      error: 'This guest does not have an email address on file. Add one before sending.',
+    }
+
+  const emailParse = z.string().email().safeParse(emailRaw)
+  if (!emailParse.success)
+    return {
+      success: false,
+      error: 'The email address on this guest is invalid. Update it before sending.',
+    }
+
+  let token = guest.rsvp_token
+  if (!token) {
+    token = crypto.randomUUID()
+    const { error: tokenError } = await supabase
+      .from('guests')
+      .update({ rsvp_token: token })
+      .eq('id', guestId)
+    if (tokenError)
+      return { success: false, error: 'Could not generate RSVP link. Please try again.' }
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const rsvpUrl = `${appUrl}/rsvp/${token}`
+
+  const market = getMarketFromLocation(event.location)
+  const tz = market === 'nigeria' ? 'Africa/Lagos' : 'Europe/London'
+  const deadlineDisplay = event.rsvp_deadline
+    ? new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz,
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(new Date(event.rsvp_deadline))
+    : null
+
+  const subject = `Please RSVP for "${event.title}"`
+  const html = buildRsvpEmailHtml(
+    guest.first_name,
+    event.title,
+    event.event_date,
+    deadlineDisplay,
+    rsvpUrl
+  )
+
+  const emailResult = await sendEmail({ to: emailRaw, subject, html })
+  if (!emailResult.success)
+    return { success: false, error: 'Could not send RSVP email. Please try again.' }
+
+  await supabase
+    .from('guests')
+    .update({ rsvp_sent_at: new Date().toISOString() })
+    .eq('id', guestId)
+
+  revalidatePath(`/events/${eventId}/guests`)
+  return { success: true }
+}
+
+// ── Bulk send RSVP invites ────────────────────────────────────────────────────
+
+export type SendBulkRsvpInvitesResult =
+  | { success: true; sent: number; failed: number; skipped: number }
+  | { success: false; error: string }
+
+export async function sendBulkRsvpInvitesAction(
+  eventId: string,
+  options: { includePreviouslySent: boolean }
+): Promise<SendBulkRsvpInvitesResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile?.role) return { success: false, error: 'Please complete onboarding first' }
+  if (profile.role !== 'planner') return { success: false, error: 'Only planners can do this' }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event || (event.created_by !== user.id && event.planner_id !== user.id))
+    return { success: false, error: 'Event not found' }
+
+  const supabase = createClient()
+
+  let pendingQuery = supabase
+    .from('guests')
+    .select('*')
+    .eq('event_id', eventId)
+    .eq('rsvp_status', 'pending')
+
+  if (!options.includePreviouslySent) {
+    pendingQuery = pendingQuery.is('rsvp_sent_at', null)
+  }
+
+  const { data: pendingRows, error: fetchError } = await pendingQuery
+
+  if (fetchError) return { success: false, error: fetchError.message }
+
+  const pendingGuests = (pendingRows ?? []) as Guest[]
+
+  if (pendingGuests.length > 200)
+    return { success: false, error: 'Too many guests in one batch. Send in smaller groups.' }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const market = getMarketFromLocation(event.location)
+  const tz = market === 'nigeria' ? 'Africa/Lagos' : 'Europe/London'
+  const deadlineDisplay = event.rsvp_deadline
+    ? new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz,
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(new Date(event.rsvp_deadline))
+    : null
+  const subject = `Please RSVP for "${event.title}"`
+
+  let sent = 0
+  let failed = 0
+  let skipped = 0
+
+  for (const guest of pendingGuests) {
+    const emailRaw = (guest.email ?? '').trim()
+    if (!emailRaw) { skipped++; continue }
+
+    const emailParse = z.string().email().safeParse(emailRaw)
+    if (!emailParse.success) { skipped++; continue }
+
+    let token = guest.rsvp_token
+    if (!token) {
+      token = crypto.randomUUID()
+      const { error: tokenError } = await supabase
+        .from('guests')
+        .update({ rsvp_token: token })
+        .eq('id', guest.id)
+      if (tokenError) { failed++; continue }
+    }
+
+    const rsvpUrl = `${appUrl}/rsvp/${token}`
+    const html = buildRsvpEmailHtml(
+      guest.first_name,
+      event.title,
+      event.event_date,
+      deadlineDisplay,
+      rsvpUrl
+    )
+
+    try {
+      const emailResult = await sendEmail({ to: emailRaw, subject, html })
+      if (emailResult.success) {
+        sent++
+        await supabase
+          .from('guests')
+          .update({ rsvp_sent_at: new Date().toISOString() })
+          .eq('id', guest.id)
+      } else { failed++ }
+    } catch {
+      failed++
+    }
+  }
+
+  revalidatePath(`/events/${eventId}/guests`)
+  return { success: true, sent, failed, skipped }
+}
+
+// ── Clear RSVP token ──────────────────────────────────────────────────────────
+
+export type ClearRsvpTokenResult = { success: true } | { success: false; error: string }
+
+export async function clearRsvpTokenAction(
+  eventId: string,
+  guestId: string
+): Promise<ClearRsvpTokenResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile?.role) return { success: false, error: 'Please complete onboarding first' }
+  if (profile.role !== 'planner') return { success: false, error: 'Only planners can do this' }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event || (event.created_by !== user.id && event.planner_id !== user.id))
+    return { success: false, error: 'Event not found' }
+
+  const supabase = createClient()
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('guests')
+    .select('event_id')
+    .eq('id', guestId)
+    .maybeSingle()
+
+  if (fetchError || !existing) return { success: false, error: 'Guest not found' }
+  if ((existing as { event_id: string }).event_id !== eventId)
+    return { success: false, error: 'Guest not found' }
+
+  const { error: updateError } = await supabase
+    .from('guests')
+    .update({ rsvp_token: null, rsvp_sent_at: null })
+    .eq('id', guestId)
+
+  if (updateError) return { success: false, error: updateError.message }
+
+  revalidatePath(`/events/${eventId}/guests`)
   return { success: true }
 }

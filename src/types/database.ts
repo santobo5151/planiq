@@ -37,6 +37,7 @@ export interface Event {
   budget_ceiling: number | null
   theme: string | null
   food_preferences: string | null
+  rsvp_deadline: string | null
   status: EventStatus
   created_at: string
   updated_at: string
@@ -125,7 +126,21 @@ export interface Guest {
   rsvp_status: GuestRsvpStatus
   dietary_notes: string | null
   plus_one: boolean
+  plus_one_allowed: boolean
+  rsvp_token: string | null
+  rsvp_responded_at: string | null
+  rsvp_sent_at: string | null
   created_at: string
+}
+
+export interface PublicRsvpGuest {
+  first_name: string
+  last_name: string
+  rsvp_status: GuestRsvpStatus
+  plus_one: boolean
+  plus_one_allowed: boolean
+  dietary_notes: string | null
+  rsvp_responded_at: string | null
 }
 
 export interface CreateEventInput {
