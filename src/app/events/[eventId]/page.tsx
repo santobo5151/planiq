@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { GeneratePlanButton } from '@/components/events/generate-plan-button'
 import { getCurrencySymbol } from '@/lib/localisation'
+import { SendInviteForm } from './_components/SendInviteForm'
 import type { EventStatus } from '@/types/database'
 
 const STATUS_STYLES: Record<EventStatus, string> = {
@@ -108,6 +109,13 @@ export default async function EventOverviewPage({
             />
           </CardContent>
         </Card>
+
+        <div className="mt-6">
+          <SendInviteForm
+            eventId={event.id}
+            clientAlreadyLinked={Boolean(event.client_id)}
+          />
+        </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-end">
           <Link

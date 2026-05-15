@@ -9,6 +9,9 @@ import {
   generateEventChecklist,
 } from '@/services/ai'
 import { ANTHROPIC_MODEL } from '@/lib/ai/anthropic'
+import { createOrReuseInvite } from '@/services/invites'
+import { sendEmail } from '@/lib/email/resend'
+import { z } from 'zod'
 import type { CreateEventInput, BudgetStatus, ChecklistStatus, GeneratedPlan } from '@/types/database'
 
 const ALLOWED_STATUSES = ['draft', 'active', 'completed'] as const
@@ -788,6 +791,106 @@ export async function updatePlanAction(
   if (updateError) {
     return { success: false, error: updateError.message }
   }
+
+  return { success: true }
+}
+
+// ── Client invite ─────────────────────────────────────────────────────────────
+
+export type SendClientInviteResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function sendClientInviteAction(
+  eventId: string,
+  email: string
+): Promise<SendClientInviteResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile?.role)
+    return { success: false, error: 'Please complete onboarding first' }
+  if (profile.role !== 'planner')
+    return { success: false, error: 'Only planners can send invites' }
+
+  const event = await getEventById(eventId, user.id)
+  if (
+    !event ||
+    (event.created_by !== user.id && event.planner_id !== user.id)
+  ) {
+    return { success: false, error: 'Event not found' }
+  }
+
+  const emailParse = z.string().email().safeParse(email.trim())
+  if (!emailParse.success)
+    return { success: false, error: 'Please enter a valid email address' }
+
+  let inviteResult: Awaited<ReturnType<typeof createOrReuseInvite>>
+  try {
+    inviteResult = await createOrReuseInvite(eventId, emailParse.data)
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Failed to create invite',
+    }
+  }
+
+  if (inviteResult.alreadyAccepted)
+    return {
+      success: false,
+      error: 'This client has already accepted the invite.',
+    }
+
+  const { invite } = inviteResult
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const inviteUrl = `${appUrl}/invite/${invite.token}`
+
+  const plannerName = profile.full_name ?? 'Your planner'
+  const eventTitle = event.title
+
+  let datePart = ''
+  if (event.event_date) {
+    const formatted = new Date(event.event_date).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+    datePart = ` on ${formatted}`
+  }
+
+  const subject = `You're invited to collaborate on "${eventTitle}" via PlanIQ`
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:20px;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <h1 style="margin:0 0 24px;font-size:22px;color:#4f46e5;">PlanIQ</h1>
+    <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Hi there,</p>
+    <p style="margin:0 0 28px;color:#1e293b;font-size:15px;">
+      <strong>${plannerName}</strong> has invited you to collaborate on
+      <strong>${eventTitle}</strong>${datePart} using PlanIQ.
+    </p>
+    <div style="text-align:center;margin:0 0 28px;">
+      <a href="${inviteUrl}"
+         style="background-color:#4f46e5;color:#fff;padding:14px 32px;text-decoration:none;border-radius:6px;font-size:16px;font-weight:600;display:inline-block;">
+        View your invitation
+      </a>
+    </div>
+    <p style="font-size:13px;color:#64748b;margin:0;line-height:1.6;">
+      This invite link does not expire, but the secure sign-in email you
+      receive after clicking it will expire in 1 hour. If it expires, just
+      open the invite link again to request a new one.
+    </p>
+  </div>
+</body>
+</html>`
+
+  const emailResult = await sendEmail({ to: emailParse.data, subject, html })
+  if (!emailResult.success)
+    return {
+      success: false,
+      error: 'Could not send invite email. Please try again.',
+    }
 
   return { success: true }
 }

@@ -111,6 +111,7 @@ export interface Invite {
   email: string
   token: string
   accepted_at: string | null
+  client_user_id: string | null
   created_at: string
 }
 
