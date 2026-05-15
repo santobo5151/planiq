@@ -20,7 +20,7 @@ const CHOICES: {
     icon: CalendarDays,
   },
   {
-    role: 'client',
+    role: 'planner',
     title: 'I am planning my own event',
     description:
       'I want help organising my own celebration with AI-generated plans and checklists.',

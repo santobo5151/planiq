@@ -1,11 +1,16 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, getUserProfile } from '@/lib/auth'
 import { Card, CardContent } from '@/components/ui/card'
 import { LogoutButton } from '@/components/dashboard/logout-button'
 
 export default async function ClientDashboardPlaceholder() {
   await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile?.role) redirect('/onboarding')
+  if (profile.role === 'planner') redirect('/dashboard')
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-indigo-50 px-4 py-12">
