@@ -1,4 +1,4 @@
-export type UserRole = 'planner' | 'client'
+export type UserRole = 'planner' | 'client' | 'vendor'
 export type EventStatus = 'draft' | 'active' | 'completed'
 export type BudgetStatus = 'pending' | 'confirmed' | 'paid'
 export type ChecklistStatus = 'todo' | 'in_progress' | 'done'
@@ -102,6 +102,9 @@ export interface EventVendor {
   vendor_id: string
   status: VendorStatus
   notes: string | null
+  invite_token: string | null
+  vendor_user_id: string | null
+  responded_at: string | null
   created_at: string
   updated_at: string
   vendor?: Vendor
@@ -141,6 +144,33 @@ export interface PublicRsvpGuest {
   plus_one_allowed: boolean
   dietary_notes: string | null
   rsvp_responded_at: string | null
+}
+
+export interface VendorInviteContext {
+  event: {
+    id: string
+    title: string
+    event_type: string | null
+    location: string | null
+    event_date: string | null
+  }
+  category: string
+  plannerNote: string | null
+  plannerName: string | null
+  inviteEmail: string
+  alreadyAccepted: boolean
+}
+
+export interface VendorUser {
+  id: string
+  business_name: string | null
+  contact_name: string | null
+  category: string | null
+  phone: string | null
+  location: string | null
+  bio: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface CreateEventInput {

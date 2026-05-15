@@ -10,6 +10,8 @@ import {
 } from '@/services/ai'
 import { ANTHROPIC_MODEL } from '@/lib/ai/anthropic'
 import { createOrReuseInvite } from '@/services/invites'
+import { createOrReuseVendorInvite } from '@/services/vendor-invites'
+import { getVendorById } from '@/services/vendors'
 import { sendEmail } from '@/lib/email/resend'
 import { getMarketFromLocation } from '@/lib/localisation'
 import { dateStringToEndOfDayISO } from '@/lib/rsvp-deadline'
@@ -1479,5 +1481,117 @@ export async function clearRsvpTokenAction(
   if (updateError) return { success: false, error: updateError.message }
 
   revalidatePath(`/events/${eventId}/guests`)
+  return { success: true }
+}
+
+// ── Vendor invite ─────────────────────────────────────────────────────────────
+
+export type SendVendorInviteResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function sendVendorInviteAction(
+  eventId: string,
+  vendorId: string
+): Promise<SendVendorInviteResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile?.role)
+    return { success: false, error: 'Please complete onboarding first' }
+  if (profile.role !== 'planner')
+    return { success: false, error: 'Only planners can send vendor invites' }
+
+  const event = await getEventById(eventId, user.id)
+  if (
+    !event ||
+    (event.created_by !== user.id && event.planner_id !== user.id)
+  ) {
+    return { success: false, error: 'Event not found' }
+  }
+
+  const vendor = await getVendorById(vendorId, user.id)
+  if (!vendor)
+    return { success: false, error: 'Vendor not found' }
+
+  const emailRaw = (vendor.email ?? '').trim()
+  if (!emailRaw)
+    return {
+      success: false,
+      error: 'This vendor does not have an email address on file. Add one before sending.',
+    }
+
+  const emailParse = z.string().email().safeParse(emailRaw)
+  if (!emailParse.success)
+    return { success: false, error: 'The email address on this vendor is invalid.' }
+
+  const inviteResult = await createOrReuseVendorInvite(eventId, vendorId)
+
+  if (inviteResult === null)
+    return { success: false, error: 'Assign this vendor to the event before sending an invite.' }
+
+  if (inviteResult.alreadyAccepted)
+    return { success: false, error: 'This vendor has already accepted the invite to this event.' }
+
+  const { eventVendor } = inviteResult
+
+  if (!eventVendor.invite_token)
+    return { success: false, error: 'Could not create vendor invite link. Please try again.' }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const inviteUrl = `${appUrl}/vendor/invite/${eventVendor.invite_token}`
+
+  const plannerName = profile.full_name ?? null
+
+  let datePart = ''
+  if (event.event_date) {
+    const formatted = new Date(event.event_date).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+    datePart = ` on ${formatted}`
+  }
+
+  const locationPart = event.location ? ` at ${event.location}` : ''
+
+  const notesBlock = eventVendor.notes
+    ? `<p style="margin:0 0 28px;padding:12px 16px;border-left:3px solid #e2e8f0;color:#475569;font-style:italic;font-size:14px;">${eventVendor.notes}</p>`
+    : ''
+
+  const subject = `${event.title}: Confirm or decline your booking`
+  const html = `<!DOCTYPE html>
+<html>
+<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:20px;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <h1 style="margin:0 0 24px;font-size:22px;color:#4f46e5;">PlanIQ</h1>
+    <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Hi ${vendor.name},</p>
+    <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">
+      <strong>${plannerName ?? 'A planner'}</strong> would like to book you for
+      <strong>${event.title}</strong>${datePart}${locationPart}.
+    </p>
+    <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">
+      <strong>Service:</strong> ${vendor.category}
+    </p>
+    ${notesBlock}
+    <div style="text-align:center;margin:0 0 28px;">
+      <a href="${inviteUrl}"
+         style="background-color:#4f46e5;color:#fff;padding:14px 32px;text-decoration:none;border-radius:6px;font-size:16px;font-weight:600;display:inline-block;">
+        Review &amp; respond
+      </a>
+    </div>
+    <p style="font-size:13px;color:#64748b;margin:0;line-height:1.6;">
+      Clicking the link will let you sign in, see the booking details, and confirm or decline.
+      This link doesn't expire.
+    </p>
+  </div>
+</body>
+</html>`
+
+  const emailResult = await sendEmail({ to: emailParse.data, subject, html })
+  if (!emailResult.success)
+    return { success: false, error: 'Could not send invite email. Please try again.' }
+
+  revalidatePath(`/events/${eventId}/vendors`)
   return { success: true }
 }

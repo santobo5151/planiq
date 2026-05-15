@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PLANNER_PROTECTED = ['/dashboard', '/events']
 const CLIENT_PROTECTED = ['/client/dashboard', '/client/event']
 // /rsvp is intentionally public — guests respond without authentication via a token-scoped URL
+// /vendor/invite is intentionally public — vendors land here via emailed token and request a magic link
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({

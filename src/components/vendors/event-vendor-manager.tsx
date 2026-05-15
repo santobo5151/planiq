@@ -2,11 +2,12 @@
 
 import {
   useState,
+  useEffect,
   useTransition,
   useRef,
-  useEffect,
   type KeyboardEvent,
 } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +29,7 @@ import {
   updateEventVendorAction,
   removeEventVendorAction,
 } from '@/app/events/[eventId]/vendors/actions'
+import { sendVendorInviteAction } from '@/app/events/[eventId]/actions'
 import { categoryBadgeClass } from '@/components/vendors/vendor-card'
 import type { Event, EventVendor, Vendor, VendorStatus } from '@/types/database'
 
@@ -106,6 +108,12 @@ function NotesInput({ initialValue, disabled, onCommit, onCancel }: NotesInputPr
 
 // ── EventVendorManager ────────────────────────────────────────────────────────
 
+interface InviteRowState {
+  pending: boolean
+  error: string | null
+  success: boolean
+}
+
 interface Props {
   event: Event
   initialEventVendors: EventVendor[]
@@ -117,8 +125,9 @@ export function EventVendorManager({
   initialEventVendors,
   allVendors,
 }: Props) {
-  const [eventVendors, setEventVendors] =
-    useState<EventVendor[]>(initialEventVendors)
+  const router = useRouter()
+  const [eventVendors, setEventVendors] = useState<EventVendor[]>(initialEventVendors)
+  const [inviteStates, setInviteStates] = useState<Record<string, InviteRowState>>({})
   const [selectedVendorId, setSelectedVendorId] = useState('')
   const [assignError, setAssignError] = useState<string | null>(null)
   const [notesEditId, setNotesEditId] = useState<string | null>(null)
@@ -128,6 +137,10 @@ export function EventVendorManager({
   const [statusPending, startStatus] = useTransition()
   const [notesPending, startNotes] = useTransition()
   const [removePending, startRemove] = useTransition()
+
+  useEffect(() => {
+    setEventVendors(initialEventVendors)
+  }, [initialEventVendors])
 
   const unassignedVendors = allVendors.filter(
     (v) => !eventVendors.some((ev) => ev.vendor_id === v.id)
@@ -149,6 +162,9 @@ export function EventVendorManager({
             vendor_id: selectedVendorId,
             status: 'invited' as VendorStatus,
             notes: null,
+            invite_token: null,
+            vendor_user_id: null,
+            responded_at: null,
             created_at: now,
             updated_at: now,
             vendor,
@@ -198,6 +214,34 @@ export function EventVendorManager({
         setEventVendors((evs) => evs.filter((ev) => ev.id !== evId))
       }
     })
+  }
+
+  async function handleSendInvite(evId: string, vendorId: string) {
+    setInviteStates((prev) => ({
+      ...prev,
+      [evId]: { pending: true, error: null, success: false },
+    }))
+    const result = await sendVendorInviteAction(event.id, vendorId)
+    if (result.success) {
+      setInviteStates((prev) => ({
+        ...prev,
+        [evId]: { pending: false, error: null, success: true },
+      }))
+      // Optimistically mark invite as sent so button shows "Resend" before refresh
+      setEventVendors((evs) =>
+        evs.map((ev) =>
+          ev.id === evId
+            ? { ...ev, invite_token: ev.invite_token ?? '__sent__' }
+            : ev
+        )
+      )
+      router.refresh()
+    } else {
+      setInviteStates((prev) => ({
+        ...prev,
+        [evId]: { pending: false, error: result.error, success: false },
+      }))
+    }
   }
 
   return (
@@ -313,87 +357,129 @@ export function EventVendorManager({
               </Card>
             ) : (
               <div className="space-y-3">
-                {eventVendors.map((ev) => (
-                  <Card
-                    key={ev.id}
-                    className={`border-slate-200 transition-opacity ${
-                      removePending ? 'opacity-70' : ''
-                    }`}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="min-w-0 flex-1 space-y-2.5">
-                          {/* Name + badges */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium text-slate-900">
-                              {ev.vendor?.name ?? 'Unknown'}
-                            </span>
-                            {ev.vendor?.category && (
-                              <Badge
-                                className={`text-xs ${categoryBadgeClass(ev.vendor.category)}`}
-                              >
-                                {ev.vendor.category}
+                {eventVendors.map((ev) => {
+                  const invState = inviteStates[ev.id]
+                  const hasEmail = !!ev.vendor?.email?.trim()
+                  return (
+                    <Card
+                      key={ev.id}
+                      className={`border-slate-200 transition-opacity ${
+                        removePending ? 'opacity-70' : ''
+                      }`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="min-w-0 flex-1 space-y-2.5">
+                            {/* Name + badges */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-slate-900">
+                                {ev.vendor?.name ?? 'Unknown'}
+                              </span>
+                              {ev.vendor?.category && (
+                                <Badge
+                                  className={`text-xs ${categoryBadgeClass(ev.vendor.category)}`}
+                                >
+                                  {ev.vendor.category}
+                                </Badge>
+                              )}
+                              <Badge className={STATUS_STYLES[ev.status]}>
+                                {STATUS_LABELS[ev.status]}
                               </Badge>
+                            </div>
+
+                            {/* Status select */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500">
+                                Status:
+                              </span>
+                              <select
+                                value={ev.status}
+                                onChange={(e) =>
+                                  handleStatusChange(
+                                    ev.id,
+                                    e.target.value as VendorStatus
+                                  )
+                                }
+                                disabled={statusPending}
+                                className="rounded border border-input bg-background px-2 py-1 text-xs"
+                              >
+                                <option value="invited">Assigned</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="declined">Declined</option>
+                              </select>
+                            </div>
+
+                            {/* Invite controls */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {ev.vendor_user_id !== null ? (
+                                <Badge className="bg-emerald-100 text-emerald-700 border-transparent text-xs">
+                                  Joined
+                                </Badge>
+                              ) : (
+                                <button
+                                  onClick={() =>
+                                    handleSendInvite(ev.id, ev.vendor_id)
+                                  }
+                                  disabled={!hasEmail || !!invState?.pending}
+                                  title={
+                                    !hasEmail
+                                      ? 'Add email to vendor record first'
+                                      : undefined
+                                  }
+                                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  {invState?.pending
+                                    ? 'Sending…'
+                                    : ev.invite_token !== null
+                                    ? 'Resend invite'
+                                    : 'Send invite'}
+                                </button>
+                              )}
+                              {invState?.success && (
+                                <span className="text-xs text-emerald-600">
+                                  Invite sent!
+                                </span>
+                              )}
+                              {invState?.error && (
+                                <span className="text-xs text-red-600">
+                                  {invState.error}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Notes */}
+                            {notesEditId === ev.id ? (
+                              <NotesInput
+                                initialValue={ev.notes ?? ''}
+                                disabled={notesPending}
+                                onCommit={(v) => commitNotes(ev.id, v)}
+                                onCancel={() => setNotesEditId(null)}
+                              />
+                            ) : (
+                              <p
+                                onClick={() => setNotesEditId(ev.id)}
+                                className="cursor-pointer text-sm text-slate-500 hover:text-indigo-600"
+                                title="Click to edit notes"
+                              >
+                                {ev.notes ?? 'Add notes…'}
+                              </p>
                             )}
-                            <Badge className={STATUS_STYLES[ev.status]}>
-                              {STATUS_LABELS[ev.status]}
-                            </Badge>
                           </div>
 
-                          {/* Status select */}
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-500">
-                              Status:
-                            </span>
-                            <select
-                              value={ev.status}
-                              onChange={(e) =>
-                                handleStatusChange(
-                                  ev.id,
-                                  e.target.value as VendorStatus
-                                )
-                              }
-                              disabled={statusPending}
-                              className="rounded border border-input bg-background px-2 py-1 text-xs"
-                            >
-                              <option value="invited">Assigned</option>
-                              <option value="confirmed">Confirmed</option>
-                              <option value="declined">Declined</option>
-                            </select>
-                          </div>
-
-                          {/* Notes */}
-                          {notesEditId === ev.id ? (
-                            <NotesInput
-                              initialValue={ev.notes ?? ''}
-                              disabled={notesPending}
-                              onCommit={(v) => commitNotes(ev.id, v)}
-                              onCancel={() => setNotesEditId(null)}
-                            />
-                          ) : (
-                            <p
-                              onClick={() => setNotesEditId(ev.id)}
-                              className="cursor-pointer text-sm text-slate-500 hover:text-indigo-600"
-                              title="Click to edit notes"
-                            >
-                              {ev.notes ?? 'Add notes…'}
-                            </p>
-                          )}
+                          {/* Remove */}
+                          <button
+                            onClick={() => setRemoveConfirmId(ev.id)}
+                            disabled={removePending}
+                            className="shrink-0 text-slate-300 hover:text-red-500 disabled:opacity-40"
+                            title="Remove vendor from event"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
-
-                        {/* Remove */}
-                        <button
-                          onClick={() => setRemoveConfirmId(ev.id)}
-                          disabled={removePending}
-                          className="shrink-0 text-slate-300 hover:text-red-500 disabled:opacity-40"
-                          title="Remove vendor from event"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
             )}
           </div>
