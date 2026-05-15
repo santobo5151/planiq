@@ -1,7 +1,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PROTECTED_PREFIXES = ['/dashboard', '/events']
+const PLANNER_PROTECTED = ['/dashboard', '/events']
+const CLIENT_PROTECTED = ['/client/dashboard', '/client/event']
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -35,13 +36,17 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isProtected = PROTECTED_PREFIXES.some(
+
+  const isPlannerProtected = PLANNER_PROTECTED.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+  const isClientProtected = CLIENT_PROTECTED.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   )
 
-  if (isProtected && !user) {
+  if ((isPlannerProtected || isClientProtected) && !user) {
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/login'
+    redirectUrl.pathname = isClientProtected ? '/client/login' : '/login'
     redirectUrl.searchParams.set('redirectedFrom', pathname)
     return NextResponse.redirect(redirectUrl)
   }
