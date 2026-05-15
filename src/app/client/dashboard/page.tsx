@@ -34,7 +34,7 @@ export default async function ClientDashboardPlaceholder() {
               planner will keep you posted.
             </p>
             <div className="pt-2">
-              <LogoutButton />
+              <LogoutButton redirectTo="/client/login" />
             </div>
           </CardContent>
         </Card>
