@@ -18,6 +18,7 @@ import {
   getClientChecklist,
   getClientConfirmedVendors,
 } from '@/services/client-events'
+import { getClientGuestSummary } from '@/services/client-guests'
 import { getCurrencySymbol } from '@/lib/localisation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -108,11 +109,13 @@ export default async function ClientEventPage({
   let budgetSummary = null
   let checklist: Awaited<ReturnType<typeof getClientChecklist>> = []
   let vendors: Awaited<ReturnType<typeof getClientConfirmedVendors>> = []
+  let guestSummary: Awaited<ReturnType<typeof getClientGuestSummary>> = null
 
   try { plan = await getClientEventPlan(params.eventId) } catch { }
   try { budgetSummary = await getClientBudgetSummary(params.eventId) } catch { }
   try { checklist = await getClientChecklist(params.eventId) } catch { }
   try { vendors = await getClientConfirmedVendors(params.eventId) } catch { }
+  try { guestSummary = await getClientGuestSummary(params.eventId) } catch { }
 
   // Plan data
   const timeline = Array.isArray(plan?.timeline) ? (plan.timeline as TlItem[]) : []
@@ -438,7 +441,7 @@ export default async function ClientEventPage({
         </Card>
 
         {/* ── E) Confirmed vendors ──────────────────────────────────────────── */}
-        <Card className="mt-6 mb-12 border-slate-200">
+        <Card className="mt-6 border-slate-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Confirmed Vendors</CardTitle>
           </CardHeader>
@@ -471,6 +474,52 @@ export default async function ClientEventPage({
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        {/* ── F) Guest summary ─────────────────────────────────────────────── */}
+        <Card className="mt-6 mb-12 border-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Guests</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 pt-0">
+            {!guestSummary ? (
+              <p className="text-sm text-slate-500">No guest information yet.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Total invited
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">
+                    {guestSummary.total}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Attending
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-600">
+                    {guestSummary.attending}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Pending
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">
+                    {guestSummary.pending}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Declined
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-slate-500">
+                    {guestSummary.declined}
+                  </p>
+                </div>
               </div>
             )}
           </CardContent>

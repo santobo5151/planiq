@@ -143,6 +143,13 @@ export default async function EventOverviewPage({
             Checklist
           </Link>
           <Link
+            href={`/events/${event.id}/guests`}
+            className={buttonVariants({ variant: 'outline', className: 'gap-2' })}
+          >
+            <Users className="h-4 w-4" />
+            Guests
+          </Link>
+          <Link
             href={`/events/${event.id}/vendors`}
             className={buttonVariants({ variant: 'outline', className: 'gap-2' })}
           >

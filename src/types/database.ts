@@ -3,6 +3,7 @@ export type EventStatus = 'draft' | 'active' | 'completed'
 export type BudgetStatus = 'pending' | 'confirmed' | 'paid'
 export type ChecklistStatus = 'todo' | 'in_progress' | 'done'
 export type RsvpStatus = 'pending' | 'attending' | 'declined'
+export type GuestRsvpStatus = 'pending' | 'attending' | 'declined'
 
 export interface Profile {
   id: string
@@ -118,9 +119,10 @@ export interface Invite {
 export interface Guest {
   id: string
   event_id: string
-  name: string
+  first_name: string
+  last_name: string
   email: string | null
-  rsvp_status: RsvpStatus
+  rsvp_status: GuestRsvpStatus
   dietary_notes: string | null
   plus_one: boolean
   created_at: string

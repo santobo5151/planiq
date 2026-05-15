@@ -12,7 +12,8 @@ import { ANTHROPIC_MODEL } from '@/lib/ai/anthropic'
 import { createOrReuseInvite } from '@/services/invites'
 import { sendEmail } from '@/lib/email/resend'
 import { z } from 'zod'
-import type { CreateEventInput, BudgetStatus, ChecklistStatus, GeneratedPlan } from '@/types/database'
+import { revalidatePath } from 'next/cache'
+import type { CreateEventInput, BudgetStatus, ChecklistStatus, GeneratedPlan, Guest, GuestRsvpStatus } from '@/types/database'
 
 const ALLOWED_STATUSES = ['draft', 'active', 'completed'] as const
 type AllowedStatus = (typeof ALLOWED_STATUSES)[number]
@@ -891,6 +892,209 @@ export async function sendClientInviteAction(
       success: false,
       error: 'Could not send invite email. Please try again.',
     }
+
+  return { success: true }
+}
+
+// ── Guest mutations ───────────────────────────────────────────────────────────
+
+const VALID_RSVP_STATUSES: GuestRsvpStatus[] = ['pending', 'attending', 'declined']
+
+export type CreateGuestResult =
+  | { success: true; guest: Guest }
+  | { success: false; error: string }
+
+export async function createGuestAction(
+  eventId: string,
+  input: {
+    first_name: string
+    last_name: string
+    email?: string | null
+    rsvp_status?: GuestRsvpStatus
+    plus_one?: boolean
+    dietary_notes?: string | null
+  }
+): Promise<CreateGuestResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner')
+    return { success: false, error: 'Only planners can add guests' }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event) return { success: false, error: 'Event not found' }
+
+  const first_name = (input.first_name ?? '').trim()
+  if (!first_name || first_name.length > 50)
+    return { success: false, error: 'First name is required' }
+
+  const last_name = (input.last_name ?? '').trim()
+  if (!last_name || last_name.length > 50)
+    return { success: false, error: 'Last name is required' }
+
+  const emailRaw = (input.email ?? '').trim()
+  const email = emailRaw || null
+  if (email) {
+    const emailParse = z.string().email().safeParse(email)
+    if (!emailParse.success)
+      return { success: false, error: 'Please enter a valid email address' }
+  }
+
+  const rsvp_status = input.rsvp_status ?? 'pending'
+  if (!VALID_RSVP_STATUSES.includes(rsvp_status))
+    return { success: false, error: 'Invalid RSVP status' }
+
+  const dietaryRaw = (input.dietary_notes ?? '').trim()
+  const dietary_notes = dietaryRaw || null
+  const plus_one = input.plus_one ?? false
+
+  const supabase = createClient()
+  const { data: inserted, error: insertError } = await supabase
+    .from('guests')
+    .insert({ event_id: eventId, first_name, last_name, email, rsvp_status, plus_one, dietary_notes })
+    .select('*')
+    .single()
+
+  if (insertError || !inserted)
+    return { success: false, error: insertError?.message ?? 'Failed to add guest' }
+
+  revalidatePath(`/events/${eventId}/guests`)
+  revalidatePath(`/events/${eventId}`)
+
+  return { success: true, guest: inserted as Guest }
+}
+
+export type UpdateGuestResult = { success: true } | { success: false; error: string }
+
+export async function updateGuestAction(
+  eventId: string,
+  guestId: string,
+  patch: Partial<{
+    first_name: string
+    last_name: string
+    email: string | null
+    rsvp_status: GuestRsvpStatus
+    plus_one: boolean
+    dietary_notes: string | null
+  }>
+): Promise<UpdateGuestResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner')
+    return { success: false, error: 'Only planners can update guests' }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event) return { success: false, error: 'Event not found' }
+
+  const supabase = createClient()
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('guests')
+    .select('event_id')
+    .eq('id', guestId)
+    .maybeSingle()
+
+  if (fetchError || !existing) return { success: false, error: 'Guest not found' }
+  if ((existing as { event_id: string }).event_id !== eventId)
+    return { success: false, error: 'Guest not found' }
+
+  const updatePayload: Record<string, unknown> = {}
+
+  if (patch.first_name !== undefined) {
+    const first_name = patch.first_name.trim()
+    if (!first_name || first_name.length > 50)
+      return { success: false, error: 'First name is required' }
+    updatePayload.first_name = first_name
+  }
+
+  if (patch.last_name !== undefined) {
+    const last_name = patch.last_name.trim()
+    if (!last_name || last_name.length > 50)
+      return { success: false, error: 'Last name is required' }
+    updatePayload.last_name = last_name
+  }
+
+  if (patch.email !== undefined) {
+    const emailRaw = (patch.email ?? '').trim()
+    const email = emailRaw || null
+    if (email) {
+      const emailParse = z.string().email().safeParse(email)
+      if (!emailParse.success)
+        return { success: false, error: 'Please enter a valid email address' }
+    }
+    updatePayload.email = email
+  }
+
+  if (patch.rsvp_status !== undefined) {
+    if (!VALID_RSVP_STATUSES.includes(patch.rsvp_status))
+      return { success: false, error: 'Invalid RSVP status' }
+    updatePayload.rsvp_status = patch.rsvp_status
+    if (patch.rsvp_status === 'declined' && patch.plus_one === undefined)
+      updatePayload.plus_one = false
+  }
+
+  if (patch.plus_one !== undefined) {
+    updatePayload.plus_one = patch.plus_one
+  }
+
+  if (patch.dietary_notes !== undefined) {
+    const dietaryRaw = (patch.dietary_notes ?? '').trim()
+    updatePayload.dietary_notes = dietaryRaw || null
+  }
+
+  if (Object.keys(updatePayload).length === 0)
+    return { success: false, error: 'No changes provided' }
+
+  const { error: updateError } = await supabase
+    .from('guests')
+    .update(updatePayload)
+    .eq('id', guestId)
+
+  if (updateError) return { success: false, error: updateError.message }
+
+  revalidatePath(`/events/${eventId}/guests`)
+  revalidatePath(`/events/${eventId}`)
+
+  return { success: true }
+}
+
+export type DeleteGuestResult = { success: true } | { success: false; error: string }
+
+export async function deleteGuestAction(
+  eventId: string,
+  guestId: string
+): Promise<DeleteGuestResult> {
+  const user = await requireAuth()
+  const profile = await getUserProfile()
+
+  if (!profile || profile.role !== 'planner')
+    return { success: false, error: 'Only planners can delete guests' }
+
+  const event = await getEventById(eventId, user.id)
+  if (!event) return { success: false, error: 'Event not found' }
+
+  const supabase = createClient()
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('guests')
+    .select('event_id')
+    .eq('id', guestId)
+    .maybeSingle()
+
+  if (fetchError || !existing) return { success: false, error: 'Guest not found' }
+  if ((existing as { event_id: string }).event_id !== eventId)
+    return { success: false, error: 'Guest not found' }
+
+  const { error: deleteError } = await supabase
+    .from('guests')
+    .delete()
+    .eq('id', guestId)
+
+  if (deleteError) return { success: false, error: deleteError.message }
+
+  revalidatePath(`/events/${eventId}/guests`)
+  revalidatePath(`/events/${eventId}`)
 
   return { success: true }
 }
