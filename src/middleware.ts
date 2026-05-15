@@ -3,8 +3,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 const PLANNER_PROTECTED = ['/dashboard', '/events']
 const CLIENT_PROTECTED = ['/client/dashboard', '/client/event']
+const VENDOR_PROTECTED = ['/vendor/dashboard', '/vendor/event']
 // /rsvp is intentionally public — guests respond without authentication via a token-scoped URL
-// /vendor/invite is intentionally public — vendors land here via emailed token and request a magic link
+// /vendor/invite and /vendor/login are intentionally public — vendors land there before authentication
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -45,10 +46,17 @@ export async function middleware(request: NextRequest) {
   const isClientProtected = CLIENT_PROTECTED.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   )
+  const isVendorProtected = VENDOR_PROTECTED.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
 
-  if ((isPlannerProtected || isClientProtected) && !user) {
+  if ((isPlannerProtected || isClientProtected || isVendorProtected) && !user) {
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = isClientProtected ? '/client/login' : '/login'
+    redirectUrl.pathname = isClientProtected
+      ? '/client/login'
+      : isVendorProtected
+        ? '/vendor/login'
+        : '/login'
     redirectUrl.searchParams.set('redirectedFrom', pathname)
     return NextResponse.redirect(redirectUrl)
   }

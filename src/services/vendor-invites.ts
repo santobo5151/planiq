@@ -41,6 +41,47 @@ export async function createOrReuseVendorInvite(
   return { alreadyAccepted: false, eventVendor, vendor }
 }
 
+/**
+ * SECURITY: Only call after the auth callback has verified the
+ * authenticated user's email matches the planner-directory vendor
+ * email AND the user's profile.role is not 'planner' or 'client'.
+ * Does NOT set status or responded_at — those are explicit vendor
+ * actions in Phase 8.5C.
+ */
+export async function markVendorInviteAccepted(
+  token: string,
+  userId: string
+): Promise<{ success: boolean }> {
+  try {
+    const admin = createAdminClient()
+
+    const { data: row } = await admin
+      .from('event_vendors')
+      .select('vendor_user_id')
+      .eq('invite_token', token)
+      .maybeSingle()
+
+    if (!row) return { success: false }
+
+    const existingUserId = (row.vendor_user_id as string | null)
+
+    if (existingUserId === null) {
+      const { error } = await admin
+        .from('event_vendors')
+        .update({ vendor_user_id: userId })
+        .eq('invite_token', token)
+      return { success: !error }
+    }
+
+    if (existingUserId === userId) return { success: true }
+
+    // Claimed by a different account
+    return { success: false }
+  } catch {
+    return { success: false }
+  }
+}
+
 export async function getVendorInviteByToken(
   token: string
 ): Promise<VendorInviteContext | null> {
