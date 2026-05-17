@@ -173,6 +173,56 @@ export interface VendorUser {
   updated_at: string
 }
 
+// Minimal projection of event fields a vendor is allowed to see.
+// Vendors must NEVER receive budget_ceiling, theme, food_preferences,
+// guest_count, client_id, planner_id, created_by, or organization_id.
+// This type enforces that boundary at the type level — services that
+// build VendorEventSummary objects must explicitly select only the
+// listed columns.
+export type VendorEventSummary = {
+  id: string
+  title: string
+  event_type: string | null
+  location: string | null
+  event_date: string | null
+}
+
+// One row in the vendor dashboard list.
+// event_vendors fields the vendor is allowed to see + minimal event data
+// + the vendor-directory category (the planner-chosen vendor category for
+// this specific assignment, distinct from the vendor's own self-declared
+// category in vendor_users).
+//
+// vendor_directory_category may be null if RLS filters the nested join
+// to the `vendors` table. UI components must render gracefully when null.
+export type VendorAssignmentListItem = {
+  event_vendor_id: string
+  status: 'invited' | 'confirmed' | 'declined'
+  notes: string | null
+  responded_at: string | null
+  created_at: string
+  vendor_directory_category: string | null
+  event: VendorEventSummary
+}
+
+// Detail shape returned by getVendorAssignmentDetail for the per-event view.
+// Looked up by eventId (NOT event_vendor_id) because the per-event route is
+// /vendor/event/[eventId]. Same minimal event projection, plus the planner's
+// note (event_vendors.notes), planner_name, and current status.
+//
+// vendor_directory_category may be null — see note on VendorAssignmentListItem.
+// planner_name may be null if the profiles RLS lookup returns no row.
+export type VendorAssignmentDetail = {
+  event_vendor_id: string
+  status: 'invited' | 'confirmed' | 'declined'
+  planner_note: string | null
+  planner_name: string | null
+  responded_at: string | null
+  created_at: string
+  vendor_directory_category: string | null
+  event: VendorEventSummary
+}
+
 export interface CreateEventInput {
   title: string
   event_type?: string

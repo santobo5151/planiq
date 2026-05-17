@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 const PLANNER_PROTECTED = ['/dashboard', '/events']
 const CLIENT_PROTECTED = ['/client/dashboard', '/client/event']
-const VENDOR_PROTECTED = ['/vendor/dashboard', '/vendor/event']
+const VENDOR_PROTECTED = ['/vendor/dashboard', '/vendor/event', '/vendor/onboarding']
 // /rsvp is intentionally public — guests respond without authentication via a token-scoped URL
 // /vendor/invite and /vendor/login are intentionally public — vendors land there before authentication
 
