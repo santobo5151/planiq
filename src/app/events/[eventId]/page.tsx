@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import {
   Calendar,
   MapPin,
+  MessageSquare,
   Palette,
   Sparkles,
   Store,
@@ -155,6 +156,13 @@ export default async function EventOverviewPage({
           >
             <Store className="h-4 w-4" />
             Vendors
+          </Link>
+          <Link
+            href={`/events/${event.id}/comments`}
+            className={buttonVariants({ variant: 'outline', className: 'gap-2' })}
+          >
+            <MessageSquare className="h-4 w-4" />
+            Comments
           </Link>
           {hasPlan && (
             <Link

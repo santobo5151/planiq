@@ -141,12 +141,20 @@ export default async function ClientEventPage({
       <ClientHeader eventTitle={event.title} />
 
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <Link
-          href="/client/dashboard"
-          className="text-sm font-medium text-indigo-600 hover:underline"
-        >
-          ← Back to events
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link
+            href="/client/dashboard"
+            className="text-sm font-medium text-indigo-600 hover:underline"
+          >
+            ← Back to events
+          </Link>
+          <Link
+            href={`/client/event/${params.eventId}/comments`}
+            className="text-sm font-medium text-indigo-600 hover:underline"
+          >
+            Comments
+          </Link>
+        </div>
 
         {/* ── A) Event summary ──────────────────────────────────────────────── */}
         <Card className="border-slate-200">

@@ -223,6 +223,35 @@ export type VendorAssignmentDetail = {
   event: VendorEventSummary
 }
 
+export type CommentSurface = 'plan' | 'budget' | 'checklist'
+
+export type PlanCommentReply = {
+  id: string
+  content: string
+  author_id: string
+  author_name: string | null
+  created_at: string
+}
+
+export type PlanCommentTopLevel = {
+  id: string
+  event_id: string
+  surface: CommentSurface
+  anchor: string | null
+  content: string
+  author_id: string
+  author_name: string | null
+  resolved_at: string | null
+  created_at: string
+  replies: PlanCommentReply[]
+}
+
+export type GroupedComments = {
+  plan: PlanCommentTopLevel[]
+  budget: PlanCommentTopLevel[]
+  checklist: PlanCommentTopLevel[]
+}
+
 export interface CreateEventInput {
   title: string
   event_type?: string
