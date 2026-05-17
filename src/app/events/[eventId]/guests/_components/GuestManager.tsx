@@ -1399,7 +1399,7 @@ export function GuestManager({
               <strong>
                 {clearTarget ? `${clearTarget.first_name} ${clearTarget.last_name}` : ''}
               </strong>
-              ? This invalidates the previous link and resets the send history. They won't be able
+              ? This invalidates the previous link and resets the send history. They won&apos;t be able
               to use the previous link anymore.
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -162,7 +162,7 @@ export function RsvpForm({
             disabled={pending}
             className="h-4 w-4 accent-indigo-600"
           />
-          I'll be bringing a plus one
+          I&apos;ll be bringing a plus one
         </label>
       )}
 
