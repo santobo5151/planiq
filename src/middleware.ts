@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PLANNER_PROTECTED = ['/dashboard', '/events']
 const CLIENT_PROTECTED = ['/client/dashboard', '/client/event']
 const VENDOR_PROTECTED = ['/vendor/dashboard', '/vendor/event', '/vendor/onboarding']
+// / is public for anonymous users; signed-in users are redirected to their role dashboard (see below)
 // /rsvp is intentionally public — guests respond without authentication via a token-scoped URL
 // /vendor/invite and /vendor/login are intentionally public — vendors land there before authentication
 
@@ -39,6 +40,40 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
+
+  if (pathname === '/' && user) {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profileError) {
+      // Don't leak user info to logs; fall through to landing page rather
+      // than redirect to a wrong place. Next request will likely succeed.
+      console.error('Middleware: profile lookup failed at /', profileError.code)
+    } else {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.search = '' // drop marketing query params on redirect
+
+      if (profile?.role === 'planner') {
+        redirectUrl.pathname = '/dashboard'
+        return NextResponse.redirect(redirectUrl)
+      }
+      if (profile?.role === 'client') {
+        redirectUrl.pathname = '/client/dashboard'
+        return NextResponse.redirect(redirectUrl)
+      }
+      if (profile?.role === 'vendor') {
+        redirectUrl.pathname = '/vendor/dashboard'
+        return NextResponse.redirect(redirectUrl)
+      }
+      // No profile row, or profile.role is null — user signed up but hasn't
+      // completed onboarding. Send them there.
+      redirectUrl.pathname = '/onboarding'
+      return NextResponse.redirect(redirectUrl)
+    }
+  }
 
   const isPlannerProtected = PLANNER_PROTECTED.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
