@@ -8,6 +8,10 @@ export const metadata = {
   title: 'PlanIQ — Plan smarter events from brief to execution',
   description:
     'PlanIQ helps professional planners and self-planners turn event ideas into plans, budgets, checklists, guests, vendors, and client collaboration. Built for UK and Nigerian event workflows.',
+  robots: {
+    index: false,
+    follow: false,
+  },
 }
 
 export default function Home() {
