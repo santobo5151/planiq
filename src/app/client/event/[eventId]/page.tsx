@@ -27,10 +27,10 @@ import type { EventStatus } from '@/types/database'
 
 // ── Status badge styles ──────────────────────────────────────────────────────
 
-const STATUS_STYLES: Record<EventStatus, string> = {
-  draft: 'bg-slate-100 text-slate-700 hover:bg-slate-100 border-transparent',
-  active: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-transparent',
-  completed: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-transparent',
+const STATUS_VARIANTS: Record<EventStatus, 'secondary' | 'default' | 'success'> = {
+  draft: 'secondary',
+  active: 'default',
+  completed: 'success',
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -170,11 +170,7 @@ export default async function ClientEventPage({
                   </p>
                 )}
               </div>
-              <Badge
-                className={
-                  STATUS_STYLES[event.status as EventStatus] ?? STATUS_STYLES.draft
-                }
-              >
+              <Badge variant={STATUS_VARIANTS[event.status as EventStatus]}>
                 {event.status}
               </Badge>
             </div>

@@ -233,7 +233,7 @@ function CommentCard({
               </span>
             )}
             {isResolved && (
-              <Badge className="border-transparent bg-emerald-100 text-xs text-emerald-700 hover:bg-emerald-100">
+              <Badge variant="success" className="text-xs">
                 {comment.resolved_at_display
                   ? `Resolved on ${comment.resolved_at_display}`
                   : 'Resolved'}

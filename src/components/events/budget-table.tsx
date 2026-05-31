@@ -35,12 +35,10 @@ const STATUS_CYCLE: Record<BudgetStatus, BudgetStatus> = {
   paid: 'pending',
 }
 
-const STATUS_STYLES: Record<BudgetStatus, string> = {
-  pending:
-    'bg-slate-100 text-slate-700 hover:bg-slate-200 border-transparent cursor-pointer',
-  confirmed:
-    'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-transparent cursor-pointer',
-  paid: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-transparent cursor-pointer',
+const STATUS_VARIANTS: Record<BudgetStatus, 'secondary' | 'warning' | 'success'> = {
+  pending: 'secondary',
+  confirmed: 'warning',
+  paid: 'success',
 }
 
 type EditableField =
@@ -519,7 +517,8 @@ export function BudgetTable({ event, items, onUpdate, onAdd, onDelete }: Props) 
                       </div>
                     ) : (
                       <Badge
-                        className={STATUS_STYLES[item.status]}
+                        variant={STATUS_VARIANTS[item.status]}
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={() => cycleStatus(item)}
                         title="Click to cycle status"
                       >

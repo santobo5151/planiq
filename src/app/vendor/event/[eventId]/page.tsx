@@ -152,19 +152,13 @@ export default async function VendorEventPage({
             <div className="flex items-center gap-3">
               <p className="text-sm font-medium text-slate-700">Status</p>
               {detail.status === 'invited' && (
-                <Badge className="border-transparent bg-amber-100 text-amber-700 hover:bg-amber-100">
-                  Invited
-                </Badge>
+                <Badge variant="warning">Invited</Badge>
               )}
               {detail.status === 'confirmed' && (
-                <Badge className="border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                  Confirmed
-                </Badge>
+                <Badge variant="success">Confirmed</Badge>
               )}
               {detail.status === 'declined' && (
-                <Badge className="border-transparent bg-slate-100 text-slate-600 hover:bg-slate-100">
-                  Declined
-                </Badge>
+                <Badge variant="destructive">Declined</Badge>
               )}
             </div>
 

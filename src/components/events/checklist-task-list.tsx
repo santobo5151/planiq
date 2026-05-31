@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { Trash2, Plus, Check, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
@@ -38,11 +39,10 @@ const STATUS_CYCLE: Record<ChecklistStatus, ChecklistStatus> = {
   done: 'todo',
 }
 
-const STATUS_STYLES: Record<ChecklistStatus, string> = {
-  todo: 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-transparent cursor-pointer',
-  in_progress:
-    'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-transparent cursor-pointer',
-  done: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-transparent cursor-pointer',
+const STATUS_VARIANTS: Record<ChecklistStatus, 'secondary' | 'warning' | 'success'> = {
+  todo: 'secondary',
+  in_progress: 'warning',
+  done: 'success',
 }
 
 const NEW_CAT = '__new__'
@@ -429,7 +429,7 @@ export function ChecklistTaskList({
               <span className="text-slate-500">{pct}%</span>
             )}
           </div>
-          <Progress value={pct} className="h-3" />
+          <Progress value={pct} className={cn('h-3', pct === 100 && '[&_[data-slot=progress-indicator]]:bg-success')} />
         </div>
 
         {/* Global add button + form */}
@@ -605,7 +605,8 @@ export function ChecklistTaskList({
                     <div className="flex items-start gap-3">
                       {/* Status badge */}
                       <Badge
-                        className={`mt-0.5 shrink-0 ${STATUS_STYLES[task.status]}`}
+                        variant={STATUS_VARIANTS[task.status]}
+                        className="mt-0.5 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={() => cycleStatus(task)}
                         title="Click to cycle status"
                       >

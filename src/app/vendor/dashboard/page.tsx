@@ -144,7 +144,7 @@ export default async function VendorDashboardPage({
                   <h2 className="text-base font-semibold text-slate-900">
                     Needs your response
                   </h2>
-                  <Badge className="border-transparent bg-amber-100 text-amber-700 hover:bg-amber-100">
+                  <Badge variant="warning">
                     {invited.length}
                   </Badge>
                 </div>
@@ -162,7 +162,7 @@ export default async function VendorDashboardPage({
                   <h2 className="text-base font-semibold text-slate-900">
                     Past responses
                   </h2>
-                  <Badge className="border-transparent bg-slate-100 text-slate-600 hover:bg-slate-100">
+                  <Badge variant="secondary">
                     {responded.length}
                   </Badge>
                 </div>
@@ -242,22 +242,10 @@ function AssignmentCard({
 
 function StatusBadge({ status }: { status: 'invited' | 'confirmed' | 'declined' }) {
   if (status === 'invited') {
-    return (
-      <Badge className="shrink-0 border-transparent bg-amber-100 text-amber-700 hover:bg-amber-100">
-        Invited
-      </Badge>
-    )
+    return <Badge variant="warning" className="shrink-0">Invited</Badge>
   }
   if (status === 'confirmed') {
-    return (
-      <Badge className="shrink-0 border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-        Confirmed
-      </Badge>
-    )
+    return <Badge variant="success" className="shrink-0">Confirmed</Badge>
   }
-  return (
-    <Badge className="shrink-0 border-transparent bg-slate-100 text-slate-600 hover:bg-slate-100">
-      Declined
-    </Badge>
-  )
+  return <Badge variant="destructive" className="shrink-0">Declined</Badge>
 }

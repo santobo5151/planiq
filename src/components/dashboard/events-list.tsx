@@ -9,10 +9,10 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-const STATUS_STYLES: Record<EventStatus, string> = {
-  draft: 'bg-slate-100 text-slate-700 hover:bg-slate-100 border-transparent',
-  active: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-transparent',
-  completed: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-transparent',
+const STATUS_VARIANTS: Record<EventStatus, 'secondary' | 'default' | 'success'> = {
+  draft: 'secondary',
+  active: 'default',
+  completed: 'success',
 }
 
 type StatusFilter = 'all' | EventStatus
@@ -149,7 +149,7 @@ export function EventsList({ events }: { events: PlanIQEvent[] }) {
                       <h3 className="line-clamp-2 font-semibold text-slate-900">
                         {event.title}
                       </h3>
-                      <Badge className={STATUS_STYLES[event.status]}>
+                      <Badge variant={STATUS_VARIANTS[event.status]}>
                         {event.status}
                       </Badge>
                     </div>

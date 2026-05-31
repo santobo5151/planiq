@@ -34,13 +34,10 @@ type REditState = { idx: number; field: 'category' | 'suggestion' | 'reason'; er
 
 // ── Priority styles ──────────────────────────────────────────────────────────
 
-const PRIORITY_STYLES: Record<VItem['priority'], string> = {
-  essential:
-    'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-transparent cursor-pointer',
-  recommended:
-    'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-transparent cursor-pointer',
-  optional:
-    'bg-slate-100 text-slate-700 hover:bg-slate-200 border-transparent cursor-pointer',
+const PRIORITY_VARIANTS: Record<VItem['priority'], 'destructive' | 'warning' | 'secondary'> = {
+  essential: 'destructive',
+  recommended: 'warning',
+  optional: 'secondary',
 }
 
 const PRIORITY_CYCLE: Record<VItem['priority'], VItem['priority']> = {
@@ -777,7 +774,8 @@ export function PlanEditor({ eventId, plan }: PlanEditorProps) {
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         <Badge
-                          className={PRIORITY_STYLES[v.priority]}
+                          variant={PRIORITY_VARIANTS[v.priority]}
+                          className="cursor-pointer hover:opacity-80 transition-opacity"
                           onClick={() => cycleVendorPriority(i)}
                           title="Click to cycle priority"
                         >

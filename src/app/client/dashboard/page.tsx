@@ -8,10 +8,10 @@ import { Badge } from '@/components/ui/badge'
 import { ClientHeader } from '@/app/client/_components/ClientHeader'
 import type { EventStatus } from '@/types/database'
 
-const STATUS_STYLES: Record<EventStatus, string> = {
-  draft: 'bg-slate-100 text-slate-700 hover:bg-slate-100 border-transparent',
-  active: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-transparent',
-  completed: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-transparent',
+const STATUS_VARIANTS: Record<EventStatus, 'secondary' | 'default' | 'success'> = {
+  draft: 'secondary',
+  active: 'default',
+  completed: 'success',
 }
 
 function formatDate(date: string | null): string {
@@ -75,12 +75,7 @@ export default async function ClientDashboardPage() {
                       </p>
                     )}
                   </div>
-                  <Badge
-                    className={
-                      STATUS_STYLES[event.status as EventStatus] ??
-                      STATUS_STYLES.draft
-                    }
-                  >
+                  <Badge variant={STATUS_VARIANTS[event.status as EventStatus]}>
                     {event.status}
                   </Badge>
                 </div>

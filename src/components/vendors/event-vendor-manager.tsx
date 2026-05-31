@@ -41,10 +41,10 @@ const STATUS_LABELS: Record<VendorStatus, string> = {
   declined: 'Declined',
 }
 
-const STATUS_STYLES: Record<VendorStatus, string> = {
-  invited: 'bg-slate-100 text-slate-700 border-transparent',
-  confirmed: 'bg-emerald-100 text-emerald-700 border-transparent',
-  declined: 'bg-red-100 text-red-700 border-transparent',
+const STATUS_VARIANTS: Record<VendorStatus, 'secondary' | 'success' | 'warning' | 'destructive'> = {
+  invited: 'warning',
+  confirmed: 'success',
+  declined: 'destructive',
 }
 
 // ── NotesInput (module-level for focus stability) ─────────────────────────────
@@ -382,7 +382,7 @@ export function EventVendorManager({
                                   {ev.vendor.category}
                                 </Badge>
                               )}
-                              <Badge className={STATUS_STYLES[ev.status]}>
+                              <Badge variant={STATUS_VARIANTS[ev.status]}>
                                 {STATUS_LABELS[ev.status]}
                               </Badge>
                             </div>
@@ -412,7 +412,7 @@ export function EventVendorManager({
                             {/* Invite controls */}
                             <div className="flex flex-wrap items-center gap-2">
                               {ev.vendor_user_id !== null ? (
-                                <Badge className="bg-emerald-100 text-emerald-700 border-transparent text-xs">
+                                <Badge variant="success" className="text-xs">
                                   Joined
                                 </Badge>
                               ) : (

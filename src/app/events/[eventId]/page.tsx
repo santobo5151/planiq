@@ -22,11 +22,10 @@ import { getCurrencySymbol } from '@/lib/localisation'
 import { SendInviteForm } from './_components/SendInviteForm'
 import type { EventStatus } from '@/types/database'
 
-const STATUS_STYLES: Record<EventStatus, string> = {
-  draft: 'bg-slate-100 text-slate-700 hover:bg-slate-100 border-transparent',
-  active: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-transparent',
-  completed:
-    'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-transparent',
+const STATUS_VARIANTS: Record<EventStatus, 'secondary' | 'default' | 'success'> = {
+  draft: 'secondary',
+  active: 'default',
+  completed: 'success',
 }
 
 function formatDate(date: string | null) {
@@ -77,7 +76,7 @@ export default async function EventOverviewPage({
               </p>
             )}
           </div>
-          <Badge className={STATUS_STYLES[event.status]}>{event.status}</Badge>
+          <Badge variant={STATUS_VARIANTS[event.status]}>{event.status}</Badge>
         </div>
 
         <Card className="mt-6 border-slate-200">
