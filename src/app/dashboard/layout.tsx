@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Wordmark } from '@/components/brand/Wordmark'
 import { Calendar, LayoutDashboard, Settings, Store, type LucideIcon } from 'lucide-react'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -38,11 +39,8 @@ export default async function DashboardLayout({
       {/* Mobile top nav */}
       <header className="border-b border-slate-200 bg-white lg:hidden">
         <div className="flex h-14 items-center justify-between px-4">
-          <Link
-            href="/dashboard"
-            className="text-xl font-bold tracking-tight text-indigo-600"
-          >
-            PlanIQ
+          <Link href="/dashboard">
+            <Wordmark className="text-xl" />
           </Link>
           <nav className="flex items-center gap-1">
             {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
@@ -64,13 +62,10 @@ export default async function DashboardLayout({
 
       <div className="flex">
         {/* Desktop sidebar */}
-        <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-slate-200 lg:bg-white">
+        <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-slate-200 lg:bg-surface-lilac">
           <div className="flex h-16 items-center px-6">
-            <Link
-              href="/dashboard"
-              className="text-2xl font-bold tracking-tight text-indigo-600"
-            >
-              PlanIQ
+            <Link href="/dashboard">
+              <Wordmark className="text-2xl" />
             </Link>
           </div>
           <nav className="flex-1 space-y-1 px-3">

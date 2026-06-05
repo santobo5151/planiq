@@ -1,19 +1,20 @@
 /**
- * Temporary MVP wordmark. Will be replaced with an image-based logo in Phase 10B.
- * Do not treat this as a final brand asset.
+ * Canonical PlanIQ text wordmark. "Plan" in indigo, "IQ" in the accent colour.
+ * Use this everywhere the brand name appears as a logo (marketing + app chrome).
  */
 import { cn } from '@/lib/utils'
 
 type WordmarkProps = {
   className?: string
   accent?: 'amber' | 'indigo'
+  tone?: 'light' | 'dark'
 }
 
-export function Wordmark({ className, accent = 'amber' }: WordmarkProps) {
+export function Wordmark({ className, accent = 'amber', tone = 'light' }: WordmarkProps) {
   return (
     <span className={cn('font-semibold tracking-tight', className)}>
-      <span className="text-indigo-900">Plan</span>
-      <span className={accent === 'amber' ? 'text-amber-500' : 'text-indigo-600'}>IQ</span>
+      <span className={tone === 'dark' ? 'text-white' : 'text-indigo-600'}>Plan</span>
+      <span className={accent === 'indigo' ? 'text-indigo-600' : tone === 'dark' ? 'text-amber-400' : 'text-amber-500'}>IQ</span>
     </span>
   )
 }

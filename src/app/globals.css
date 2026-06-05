@@ -32,6 +32,10 @@
     --brand-accent: 38 92% 50%;
     --brand-accent-foreground: 26 83% 14%;
     --brand-primary-deep: 243 47% 34%;
+    --surface-cream: 48 100% 96%;
+    --surface-cream-foreground: 35 75% 20%;
+    --surface-lilac: 232 100% 96%;
+    --surface-lilac-foreground: 243 47% 34%;
   }
 
   .dark {
@@ -62,6 +66,10 @@
     --brand-accent: 38 92% 50%;
     --brand-accent-foreground: 26 83% 14%;
     --brand-primary-deep: 243 75% 65%;
+    --surface-cream: 35 20% 12%;
+    --surface-cream-foreground: 48 50% 88%;
+    --surface-lilac: 243 25% 14%;
+    --surface-lilac-foreground: 232 50% 88%;
   }
 }
 
@@ -71,5 +79,12 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .font-numeric {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
   }
 }

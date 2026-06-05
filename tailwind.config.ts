@@ -64,6 +64,21 @@ const config: Config = {
           },
           'primary-deep': 'hsl(var(--brand-primary-deep))',
         },
+        surface: {
+          cream: {
+            DEFAULT: "hsl(var(--surface-cream))",
+            foreground: "hsl(var(--surface-cream-foreground))",
+          },
+          lilac: {
+            DEFAULT: "hsl(var(--surface-lilac))",
+            foreground: "hsl(var(--surface-lilac-foreground))",
+          },
+        },
+      },
+      fontFamily: {
+        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
+        serif: ['var(--font-fraunces)', 'ui-serif', 'Georgia', 'Cambria', 'serif'],
       },
       borderRadius: {
         lg: "var(--radius)",
