@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { generatePlanAction } from '@/app/events/[eventId]/actions'
+import { generatePlanAction } from '@/app/(app)/events/[eventId]/actions'
 
 interface Props {
   eventId: string

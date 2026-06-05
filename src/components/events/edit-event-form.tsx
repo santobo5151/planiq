@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { updateEventAction } from '@/app/events/[eventId]/actions'
+import { updateEventAction } from '@/app/(app)/events/[eventId]/actions'
 import type {
   CreateEventInput,
   Event as PlanIQEvent,

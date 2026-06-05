@@ -28,8 +28,8 @@ import {
   assignVendorAction,
   updateEventVendorAction,
   removeEventVendorAction,
-} from '@/app/events/[eventId]/vendors/actions'
-import { sendVendorInviteAction } from '@/app/events/[eventId]/actions'
+} from '@/app/(app)/events/[eventId]/vendors/actions'
+import { sendVendorInviteAction } from '@/app/(app)/events/[eventId]/actions'
 import { categoryBadgeClass } from '@/components/vendors/vendor-card'
 import type { Event, EventVendor, Vendor, VendorStatus } from '@/types/database'
 
@@ -273,8 +273,7 @@ export function EventVendorManager({
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12">
-        <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl">
           <Link
             href={`/events/${event.id}`}
             className="text-sm font-medium text-indigo-600 hover:underline"
@@ -483,7 +482,6 @@ export function EventVendorManager({
               </div>
             )}
           </div>
-        </div>
       </div>
     </>
   )

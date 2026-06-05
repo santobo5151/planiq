@@ -23,7 +23,7 @@ import {
   updateBudgetItemAction,
   addBudgetItemAction,
   deleteBudgetItemAction,
-} from '@/app/events/[eventId]/actions'
+} from '@/app/(app)/events/[eventId]/actions'
 import { getCurrencySymbol } from '@/lib/localisation'
 import type { Event as PlanIQEvent, Budget, BudgetStatus } from '@/types/database'
 

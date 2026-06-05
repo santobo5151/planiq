@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { deleteVendorAction } from '@/app/dashboard/vendors/actions'
+import { deleteVendorAction } from '@/app/(app)/dashboard/vendors/actions'
 import { VendorForm } from '@/components/vendors/vendor-form'
 import type { Vendor } from '@/types/database'
 

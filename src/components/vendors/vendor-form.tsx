@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   addVendorAction,
   updateVendorAction,
-} from '@/app/dashboard/vendors/actions'
+} from '@/app/(app)/dashboard/vendors/actions'
 import type { Vendor } from '@/types/database'
 
 const UK_CITIES = [

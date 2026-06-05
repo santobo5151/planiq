@@ -27,7 +27,7 @@ import {
   updateChecklistItemAction,
   addChecklistItemAction,
   deleteChecklistItemAction,
-} from '@/app/events/[eventId]/actions'
+} from '@/app/(app)/events/[eventId]/actions'
 import type { Checklist, ChecklistStatus } from '@/types/database'
 import type { ProgressData } from '@/components/events/checklist-manager'
 

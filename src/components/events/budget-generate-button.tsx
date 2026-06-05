@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { generateBudgetAction } from '@/app/events/[eventId]/actions'
+import { generateBudgetAction } from '@/app/(app)/events/[eventId]/actions'
 
 interface Props {
   eventId: string

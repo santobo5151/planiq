@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { updatePlanAction } from '@/app/events/[eventId]/actions'
+import { updatePlanAction } from '@/app/(app)/events/[eventId]/actions'
 import { GeneratePlanButton } from '@/components/events/generate-plan-button'
 import { BudgetGenerateButton } from '@/components/events/budget-generate-button'
 import type { GeneratedPlan } from '@/types/database'

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createEventAction } from '@/app/events/new/actions'
+import { createEventAction } from '@/app/(app)/events/new/actions'
 import type { CreateEventInput } from '@/types/database'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

@@ -66,8 +66,7 @@ export function VendorManager({ initialVendors }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:py-12">
-      <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
@@ -163,7 +162,6 @@ export function VendorManager({ initialVendors }: Props) {
             ))}
           </div>
         )}
-      </div>
     </div>
   )
 }
