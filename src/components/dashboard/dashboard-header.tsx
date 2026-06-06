@@ -18,7 +18,7 @@ function formatToday(date: Date) {
   })
 }
 
-export function DashboardHeader({ firstName }: { firstName: string }) {
+export function DashboardHeader({ firstName }: { firstName: string | null }) {
   const [greeting, setGreeting] = useState<string | null>(null)
   const [today, setToday] = useState<string | null>(null)
 
@@ -28,10 +28,18 @@ export function DashboardHeader({ firstName }: { firstName: string }) {
     setToday(formatToday(now))
   }, [])
 
+  const heading = greeting
+    ? firstName
+      ? `${greeting}, ${firstName}`
+      : greeting
+    : firstName
+      ? `Hello, ${firstName}`
+      : 'Hello'
+
   return (
     <div className="space-y-1">
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-        {greeting ? `${greeting}, ${firstName}` : `Hello, ${firstName}`}
+        {heading}
       </h1>
       {today && <p className="text-sm text-slate-500">{today}</p>}
       <p className="pt-2 text-slate-600">Here is an overview of your events.</p>

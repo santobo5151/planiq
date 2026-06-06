@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   if (profile.role === 'client') redirect('/client/dashboard')
 
   const events = await getPlannerEvents(user.id)
-  const firstName = profile.full_name?.split(' ')[0] ?? 'there'
+  const firstName = profile.full_name?.trim().split(' ')[0] || null
 
   return (
     <div className="space-y-8">
