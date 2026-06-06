@@ -193,6 +193,33 @@ export async function GET(request: Request) {
       )
     }
 
+    // ── Signup email-confirmation path ────────────────────────────────────────
+    // Reached when email confirmation is enabled and the user clicks the link
+    // from the signup confirmation email. Role may already be set (e.g. completed
+    // onboarding on another device) or still null — never assign here.
+    if (loginType === 'signup') {
+      const { data: profileRow } = await admin
+        .from('profiles')
+        .select('id, role')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      const role = (profileRow?.role ?? null) as string | null
+
+      if (role === 'planner') {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+      if (role === 'client') {
+        return NextResponse.redirect(new URL('/client/dashboard', request.url))
+      }
+      if (role === 'vendor') {
+        return NextResponse.redirect(new URL('/vendor/dashboard', request.url))
+      }
+
+      // null role or no profile row — send to onboarding; do NOT set role
+      return NextResponse.redirect(new URL('/onboarding', request.url))
+    }
+
     // ── Vendor regular-login path ─────────────────────────────────────────────
     // Reached when a vendor uses /vendor/login → magic link (no invite token).
     // Does NOT create or update profiles — if no vendor profile exists, fail clearly.
@@ -220,32 +247,52 @@ export async function GET(request: Request) {
       )
     }
 
-    // ── Regular client login ──────────────────────────────────────────────────
-    const { data: existingProfile } = await admin
-      .from('profiles')
-      .select('id, role')
-      .eq('id', user.id)
-      .maybeSingle()
+    // ── Client regular-login path ─────────────────────────────────────────────
+    // Reached when a client uses /client/login → magic link (no invite token).
+    if (loginType === 'client') {
+      const { data: profileRow } = await admin
+        .from('profiles')
+        .select('id, role')
+        .eq('id', user.id)
+        .maybeSingle()
 
-    if (!existingProfile) {
-      await admin.from('profiles').insert({ id: user.id, role: 'client' })
+      const role = (profileRow?.role ?? null) as string | null
+
+      if (role === 'planner' || role === 'vendor') {
+        return redirectError(
+          'This is a planner or vendor account. Please sign in at the correct login page.'
+        )
+      }
+
+      if (role === 'client') {
+        return NextResponse.redirect(new URL('/client/dashboard', request.url))
+      }
+
+      if (profileRow && role === null) {
+        const { error: updErr } = await admin
+          .from('profiles')
+          .update({ role: 'client' })
+          .eq('id', user.id)
+        if (updErr) {
+          return redirectError('Could not complete client sign-in. Please try again.')
+        }
+        return NextResponse.redirect(new URL('/client/dashboard', request.url))
+      }
+
+      // No profile row
+      const { error: insErr } = await admin
+        .from('profiles')
+        .insert({ id: user.id, role: 'client' })
+      if (insErr) {
+        return redirectError('Could not complete client sign-in. Please try again.')
+      }
       return NextResponse.redirect(new URL('/client/dashboard', request.url))
     }
 
-    if (existingProfile.role === null) {
-      await admin
-        .from('profiles')
-        .update({ role: 'client' })
-        .eq('id', user.id)
-    }
-
-    const role = existingProfile.role as string | null
-    const dest =
-      role === 'planner' ? '/dashboard' :
-      role === 'vendor' ? '/vendor/dashboard' :
-      '/client/dashboard'
-
-    return NextResponse.redirect(new URL(dest, request.url))
+    // ── No recognised login_type ──────────────────────────────────────────────
+    return redirectError(
+      'Unable to determine how to sign you in. Please use the correct login page for your account.'
+    )
 
   } catch {
     return redirectError('Something went wrong. Please try again.')
