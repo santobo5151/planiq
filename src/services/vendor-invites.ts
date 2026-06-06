@@ -121,7 +121,7 @@ export async function getVendorInviteByToken(
 
   const { data: profileRow } = await admin
     .from('profiles')
-    .select('full_name')
+    .select('full_name, business_name')
     .eq('id', plannerId)
     .maybeSingle()
 
@@ -135,7 +135,7 @@ export async function getVendorInviteByToken(
     },
     category: vendorData.category,
     plannerNote: (row.notes as string | null) ?? null,
-    plannerName: (profileRow?.full_name as string | null) ?? null,
+    plannerName: profileRow?.business_name ?? profileRow?.full_name ?? null,
     inviteEmail: vendorData.email ?? '',
     alreadyAccepted: row.vendor_user_id !== null,
   }

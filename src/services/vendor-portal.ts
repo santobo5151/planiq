@@ -114,10 +114,10 @@ export async function getVendorAssignmentDetail(
       try {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, business_name')
           .eq('id', plannerId)
           .maybeSingle()
-        planner_name = (profileData?.full_name as string | null) ?? null
+        planner_name = profileData?.business_name ?? profileData?.full_name ?? null
       } catch {
         console.error('getVendorAssignmentDetail planner name fetch failed')
         planner_name = null

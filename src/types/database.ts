@@ -9,6 +9,7 @@ export interface Profile {
   id: string
   role: UserRole | null
   full_name: string | null
+  business_name: string | null
   avatar_url: string | null
   organization_id: string | null
   created_at: string

@@ -55,10 +55,10 @@ async function lookupPlannerName(
   try {
     const { data } = await supabase
       .from('profiles')
-      .select('full_name')
+      .select('full_name, business_name')
       .eq('id', id)
       .maybeSingle()
-    return (data?.full_name as string | null) ?? null
+    return data?.business_name ?? data?.full_name ?? null
   } catch {
     return null
   }

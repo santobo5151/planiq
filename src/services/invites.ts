@@ -78,7 +78,7 @@ export async function getInviteByToken(token: string): Promise<{
 
   const { data: profileRow } = await admin
     .from('profiles')
-    .select('full_name')
+    .select('full_name, business_name')
     .eq('id', plannerId)
     .maybeSingle()
 
@@ -89,7 +89,7 @@ export async function getInviteByToken(token: string): Promise<{
       title: eventData.title,
       event_date: eventData.event_date,
     },
-    plannerName: (profileRow?.full_name as string | null) ?? null,
+    plannerName: profileRow?.business_name ?? profileRow?.full_name ?? null,
   }
 }
 
