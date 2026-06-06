@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,47 +15,47 @@ import {
 } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export default function LoginPage() {
-  const router = useRouter()
-  const supabase = createClient()
-
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
+    setMessage(null)
+
+    const trimmedEmail = email.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address.')
+      return
+    }
+
     setLoading(true)
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const supabase = createClient()
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    const redirectTo = `${appUrl}/auth/reset`
 
-    if (signInError || !data.user) {
-      setError(signInError?.message ?? 'Could not sign in.')
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, { redirectTo })
+
+    if (error) {
+      setError("We couldn't send the reset email right now. Please try again later.")
       setLoading(false)
       return
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', data.user.id)
-      .maybeSingle()
-
-    const target = profile?.role ? '/dashboard' : '/onboarding'
-    router.push(target)
-    router.refresh()
+    setEmail('')
+    setMessage("If an account exists for that email, we've sent instructions to your inbox. Planner accounts can use the reset link; client and vendor accounts should use their magic-link sign-in page.")
+    setLoading(false)
   }
 
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader className="space-y-2">
-        <CardTitle className="text-2xl">Welcome back</CardTitle>
-        <CardDescription>Log in to your PlanIQ account.</CardDescription>
+        <CardTitle className="text-2xl">Reset your password</CardTitle>
+        <CardDescription>Enter your email and we&apos;ll send you a reset link.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -72,26 +71,15 @@ export default function LoginPage() {
               disabled={loading}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-
-          <div className="text-right">
-            <Link href="/forgot-password" className="text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:underline">Forgot password?</Link>
-          </div>
 
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {message && (
+            <Alert className="border-indigo-200 bg-indigo-50 text-indigo-900">
+              <AlertDescription>{message}</AlertDescription>
             </Alert>
           )}
 
@@ -100,17 +88,16 @@ export default function LoginPage() {
             className="w-full bg-indigo-600 hover:bg-indigo-700"
             disabled={loading}
           >
-            {loading ? 'Logging in…' : 'Log in'}
+            {loading ? 'Sending…' : 'Send reset link'}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-sm text-slate-600">
-          Don&apos;t have an account?{' '}
           <Link
-            href="/signup"
-            className="font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+            href="/login"
+            className="text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
           >
-            Sign up
+            Back to log in
           </Link>
         </p>
       </CardContent>
