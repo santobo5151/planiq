@@ -13,6 +13,7 @@ import { createOrReuseInvite } from '@/services/invites'
 import { createOrReuseVendorInvite } from '@/services/vendor-invites'
 import { getVendorById } from '@/services/vendors'
 import { sendEmail } from '@/lib/email/resend'
+import { renderBrandedEmail } from '@/lib/email/layout'
 import { getMarketFromLocation } from '@/lib/localisation'
 import { dateStringToEndOfDayISO } from '@/lib/rsvp-deadline'
 import { z } from 'zod'
@@ -864,13 +865,7 @@ export async function sendClientInviteAction(
   }
 
   const subject = `You're invited to collaborate on "${eventTitle}" via PlanIQ`
-  const html = `
-<!DOCTYPE html>
-<html>
-<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:20px;">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-    <h1 style="margin:0 0 24px;font-size:22px;color:#4f46e5;">PlanIQ</h1>
-    <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Hi there,</p>
+  const html = renderBrandedEmail({ bodyHtml: `<p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Hi there,</p>
     <p style="margin:0 0 28px;color:#1e293b;font-size:15px;">
       <strong>${plannerName}</strong> has invited you to collaborate on
       <strong>${eventTitle}</strong>${datePart} using PlanIQ.
@@ -885,10 +880,7 @@ export async function sendClientInviteAction(
       This invite link does not expire, but the secure sign-in email you
       receive after clicking it will expire in 1 hour. If it expires, just
       open the invite link again to request a new one.
-    </p>
-  </div>
-</body>
-</html>`
+    </p>` })
 
   const emailResult = await sendEmail({ to: emailParse.data, subject, html })
   if (!emailResult.success)
@@ -1135,12 +1127,7 @@ function buildRsvpEmailHtml(
     ? `<p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Please respond by <strong>${deadlineDisplay}</strong>.</p>`
     : ''
 
-  return `<!DOCTYPE html>
-<html>
-<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:20px;">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-    <h1 style="margin:0 0 24px;font-size:22px;color:#4f46e5;">PlanIQ</h1>
-    <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Hi ${guestFirstName},</p>
+  return renderBrandedEmail({ bodyHtml: `<p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Hi ${guestFirstName},</p>
     <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">${eventLine}</p>
     ${deadlineLine}
     <div style="text-align:center;margin:0 0 28px;">
@@ -1152,10 +1139,7 @@ function buildRsvpEmailHtml(
     <p style="font-size:13px;color:#64748b;margin:0;line-height:1.6;">
       This RSVP link remains available, but responses may close after the RSVP deadline set by
       your planner. You can update your response any time before then.
-    </p>
-  </div>
-</body>
-</html>`
+    </p>` })
 }
 
 // ── RSVP deadline action ──────────────────────────────────────────────────────
@@ -1560,12 +1544,7 @@ export async function sendVendorInviteAction(
     : ''
 
   const subject = `${event.title}: Confirm or decline your booking`
-  const html = `<!DOCTYPE html>
-<html>
-<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:20px;">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-    <h1 style="margin:0 0 24px;font-size:22px;color:#4f46e5;">PlanIQ</h1>
-    <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Hi ${vendor.name},</p>
+  const html = renderBrandedEmail({ bodyHtml: `<p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Hi ${vendor.name},</p>
     <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">
       <strong>${plannerName ?? 'A planner'}</strong> would like to book you for
       <strong>${event.title}</strong>${datePart}${locationPart}.
@@ -1583,10 +1562,7 @@ export async function sendVendorInviteAction(
     <p style="font-size:13px;color:#64748b;margin:0;line-height:1.6;">
       Clicking the link will let you sign in, see the booking details, and confirm or decline.
       This link doesn't expire.
-    </p>
-  </div>
-</body>
-</html>`
+    </p>` })
 
   const emailResult = await sendEmail({ to: emailParse.data, subject, html })
   if (!emailResult.success)
