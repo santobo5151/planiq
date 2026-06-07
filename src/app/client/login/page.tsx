@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Wordmark } from '@/components/brand/Wordmark'
 import {
   Card,
   CardContent,
@@ -11,11 +12,8 @@ import { ClientLoginForm } from './_components/ClientLoginForm'
 export default function ClientLoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-indigo-50 px-4 py-12 flex flex-col items-center justify-center">
-      <Link
-        href="/"
-        className="mb-8 text-2xl font-bold tracking-tight text-indigo-600"
-      >
-        PlanIQ
+      <Link href="/" aria-label="PlanIQ home" className="mb-8">
+        <Wordmark className="text-2xl" />
       </Link>
 
       <Card className="w-full max-w-md border-slate-200">

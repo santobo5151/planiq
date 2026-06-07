@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { getInviteByToken } from '@/services/invites'
+import { Wordmark } from '@/components/brand/Wordmark'
 import { Card, CardContent } from '@/components/ui/card'
 import { AcceptInviteButton } from './_components/AcceptInviteButton'
 
@@ -111,11 +112,8 @@ export default async function InvitePage({
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-indigo-50 px-4 py-12 flex flex-col items-center justify-center">
-      <Link
-        href="/"
-        className="mb-8 text-2xl font-bold tracking-tight text-indigo-600"
-      >
-        PlanIQ
+      <Link href="/" aria-label="PlanIQ home" className="mb-8">
+        <Wordmark className="text-2xl" />
       </Link>
       {children}
     </div>
