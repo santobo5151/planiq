@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { buttonVariants } from '@/components/ui/button'
 import { OnboardingChoices } from './onboarding-choices'
+import { Wordmark } from '@/components/brand/Wordmark'
 
 export default async function OnboardingPage() {
   const supabase = createClient()
@@ -37,9 +38,7 @@ export default async function OnboardingPage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-indigo-50 px-4 py-12">
       <div className="mx-auto max-w-3xl">
         <div className="mb-10 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-indigo-600">
-            PlanIQ
-          </h1>
+          <Wordmark className="text-3xl" />
           <h2 className="mt-6 text-2xl font-semibold text-slate-900 sm:text-3xl">
             Welcome{firstName ? `, ${firstName}` : ''} 👋
           </h2>
@@ -57,9 +56,7 @@ function OnboardingError({ message }: { message: string }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-indigo-50 px-4 py-12">
       <div className="mx-auto max-w-md space-y-6 text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-indigo-600">
-          PlanIQ
-        </h1>
+        <Wordmark className="text-3xl" />
         <Alert variant="destructive" className="text-left">
           <AlertDescription>{message}</AlertDescription>
         </Alert>
