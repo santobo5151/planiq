@@ -36,3 +36,6 @@ yarn-error.log*
 next-env.d.ts
 .next.nosync
 .next
+
+# Supabase schema dump artifacts (build-time only, not source)
+*-schema-*.sql
