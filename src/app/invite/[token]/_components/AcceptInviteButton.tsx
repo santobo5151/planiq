@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { createClient } from '@/lib/supabase/client'
+import { prepareClientInviteSignIn } from './actions'
 
 interface Props {
   email: string
@@ -18,12 +19,18 @@ export function AcceptInviteButton({ email, token }: Props) {
     setState('loading')
     setErrorMessage(null)
 
+    const prep = await prepareClientInviteSignIn(token)
+    if (!prep.success || !prep.email) {
+      setErrorMessage(prep.error ?? 'Something went wrong. Please try again.')
+      setState('error')
+      return
+    }
+
     const supabase = createClient()
     const redirectTo = `${window.location.origin}/auth/callback?invite_token=${encodeURIComponent(token)}`
-
     const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo },
+      email: prep.email,
+      options: { shouldCreateUser: false, emailRedirectTo: redirectTo },
     })
 
     if (error) {

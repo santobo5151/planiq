@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { prepareVendorInviteSignIn } from './actions'
 
 interface Props {
   email: string
@@ -19,21 +20,25 @@ export function AcceptVendorInviteButton({ email, token }: Props) {
     setPending(true)
     setError(null)
 
+    const prep = await prepareVendorInviteSignIn(token)
+    if (!prep.success || !prep.email) {
+      setError(prep.error ?? 'Something went wrong. Please try again.')
+      setPending(false)
+      return
+    }
+
     const supabase = createClient()
     const { error: otpError } = await supabase.auth.signInWithOtp({
-      email,
+      email: prep.email,
       options: {
+        shouldCreateUser: false,
         emailRedirectTo: `${window.location.origin}/auth/callback?vendor_invite_token=${encodeURIComponent(token)}`,
       },
     })
 
     setPending(false)
-
-    if (otpError) {
-      setError(otpError.message)
-    } else {
-      setSent(true)
-    }
+    if (otpError) setError(otpError.message)
+    else setSent(true)
   }
 
   if (sent) {
