@@ -188,6 +188,25 @@ export async function GET(request: Request) {
       }
       // role = 'planner' or 'client' → leave unchanged
 
+      const inviteClientName = (invite.client_name ?? '').trim()
+      if (inviteClientName) {
+        const { data: nameProfile } = await admin
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle()
+        const existingName = (nameProfile?.full_name ?? '').trim()
+        if (!existingName) {
+          const { error: nameUpdateError } = await admin
+            .from('profiles')
+            .update({ full_name: inviteClientName })
+            .eq('id', user.id)
+          if (nameUpdateError) {
+            console.error('Could not backfill client full_name from invite', nameUpdateError)
+          }
+        }
+      }
+
       return NextResponse.redirect(
         new URL(`/client/event/${event.id}`, request.url)
       )

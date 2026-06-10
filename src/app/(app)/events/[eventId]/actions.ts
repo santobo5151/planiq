@@ -809,7 +809,8 @@ export type SendClientInviteResult =
 
 export async function sendClientInviteAction(
   eventId: string,
-  email: string
+  email: string,
+  clientName?: string
 ): Promise<SendClientInviteResult> {
   const user = await requireAuth()
   const profile = await getUserProfile()
@@ -831,9 +832,14 @@ export async function sendClientInviteAction(
   if (!emailParse.success)
     return { success: false, error: 'Please enter a valid email address' }
 
+  const trimmedName = (clientName ?? '').trim()
+  if (trimmedName.length > 100) {
+    return { success: false, error: 'Client name must be 100 characters or fewer.' }
+  }
+
   let inviteResult: Awaited<ReturnType<typeof createOrReuseInvite>>
   try {
-    inviteResult = await createOrReuseInvite(eventId, emailParse.data)
+    inviteResult = await createOrReuseInvite(eventId, emailParse.data, trimmedName || null)
   } catch (e) {
     return {
       success: false,

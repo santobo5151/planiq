@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { sendClientInviteAction } from '@/app/(app)/events/[eventId]/actions'
@@ -15,6 +16,7 @@ interface Props {
 
 export function SendInviteForm({ eventId, clientAlreadyLinked }: Props) {
   const [email, setEmail] = useState('')
+  const [clientName, setClientName] = useState('')
   const [successEmail, setSuccessEmail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -25,10 +27,11 @@ export function SendInviteForm({ eventId, clientAlreadyLinked }: Props) {
     setSuccessEmail(null)
 
     startTransition(async () => {
-      const result = await sendClientInviteAction(eventId, email)
+      const result = await sendClientInviteAction(eventId, email, clientName)
       if (result.success) {
         setSuccessEmail(email.trim())
         setEmail('')
+        setClientName('')
       } else {
         setError(result.error)
       }
@@ -69,26 +72,43 @@ export function SendInviteForm({ eventId, clientAlreadyLinked }: Props) {
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value)
-              setError(null)
-            }}
-            placeholder="client@example.com"
-            className="flex-1"
-            disabled={pending}
-            required
-          />
-          <Button
-            type="submit"
-            disabled={pending || !email.trim()}
-            className="bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-70"
-          >
-            {pending ? 'Sending…' : 'Send invite'}
-          </Button>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="clientName">Client name (optional)</Label>
+            <Input
+              id="clientName"
+              type="text"
+              value={clientName}
+              onChange={(e) => {
+                setClientName(e.target.value)
+                setError(null)
+              }}
+              placeholder="Jane Doe"
+              maxLength={100}
+              disabled={pending}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setError(null)
+              }}
+              placeholder="client@example.com"
+              className="flex-1"
+              disabled={pending}
+              required
+            />
+            <Button
+              type="submit"
+              disabled={pending || !email.trim()}
+              className="bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-70"
+            >
+              {pending ? 'Sending…' : 'Send invite'}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

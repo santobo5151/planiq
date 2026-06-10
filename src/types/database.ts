@@ -118,6 +118,7 @@ export interface Invite {
   token: string
   accepted_at: string | null
   client_user_id: string | null
+  client_name: string | null
   created_at: string
 }
 

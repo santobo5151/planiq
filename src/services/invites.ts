@@ -4,13 +4,20 @@ import type { Invite } from '@/types/database'
 
 export async function createOrReuseInvite(
   eventId: string,
-  email: string
+  email: string,
+  clientName?: string | null
 ): Promise<
   | { alreadyAccepted: true }
   | { alreadyAccepted: false; invite: Invite }
 > {
   const normalised = email.toLowerCase().trim()
   const admin = createAdminClient()
+
+  const trimmedName = (clientName ?? '').trim()
+  if (trimmedName.length > 100) {
+    throw new Error('Client name must be 100 characters or fewer.')
+  }
+  const nameValue = trimmedName.length > 0 ? trimmedName : null
 
   const { data: existing } = await admin
     .from('invites')
@@ -22,6 +29,16 @@ export async function createOrReuseInvite(
   if (existing) {
     const row = existing as Invite
     if (row.accepted_at !== null) return { alreadyAccepted: true }
+    if (nameValue) {
+      const { error: updateError } = await admin
+        .from('invites')
+        .update({ client_name: nameValue })
+        .eq('id', row.id)
+      if (updateError) {
+        throw new Error(`Failed to update invite client name: ${updateError.message}`)
+      }
+      row.client_name = nameValue
+    }
     return { alreadyAccepted: false, invite: row }
   }
 
@@ -31,6 +48,7 @@ export async function createOrReuseInvite(
       event_id: eventId,
       email: normalised,
       token: crypto.randomUUID(),
+      client_name: nameValue,
     })
     .select('*')
     .single()
@@ -71,6 +89,7 @@ export async function getInviteByToken(token: string): Promise<{
     token: row.token,
     accepted_at: row.accepted_at,
     client_user_id: row.client_user_id ?? null,
+    client_name: row.client_name ?? null,
     created_at: row.created_at,
   }
 
