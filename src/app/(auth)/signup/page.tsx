@@ -69,6 +69,7 @@ export default function SignupPage() {
     setSubmittedEmail(null)
     setError(null)
     setLoading(false)
+    setEmail('')
   }
 
   if (submittedEmail) {
