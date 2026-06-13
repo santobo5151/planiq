@@ -70,7 +70,13 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  if (pathname === '/' && user) {
+  const authEntryPaths = new Set(['/', '/login', '/signup'])
+  const authEntryNormalised =
+    pathname !== '/' && pathname.endsWith('/')
+      ? pathname.slice(0, -1)
+      : pathname
+
+  if (authEntryPaths.has(authEntryNormalised) && user) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
