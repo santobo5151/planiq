@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Mail } from 'lucide-react'
@@ -29,18 +29,6 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
 
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null)
-  const [cooldown, setCooldown] = useState(0)
-  const [resending, setResending] = useState(false)
-  const [resendError, setResendError] = useState<string | null>(null)
-  const [resendMessage, setResendMessage] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (cooldown <= 0) return
-    const id = setTimeout(() => {
-      setCooldown((current) => Math.max(0, current - 1))
-    }, 1000)
-    return () => clearTimeout(id)
-  }, [cooldown])
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -73,46 +61,13 @@ export default function SignupPage() {
       router.refresh()
     } else {
       setSubmittedEmail(email)
-      setCooldown(60)
       setLoading(false)
-    }
-  }
-
-  async function onResend() {
-    if (cooldown > 0 || resending || !submittedEmail) return
-    setResending(true)
-    setResendError(null)
-    setResendMessage(null)
-    try {
-      const { error: resendErr } = await supabase.auth.resend({
-        type: 'signup',
-        email: submittedEmail,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?login_type=signup`,
-        },
-      })
-      if (resendErr) {
-        setResendError('Please wait a moment before requesting another email.')
-        setCooldown(60)
-        return
-      }
-      setResendMessage('Confirmation email resent.')
-      setCooldown(60)
-    } catch {
-      setResendError('Something went wrong. Please try again.')
-      setCooldown(60)
-    } finally {
-      setResending(false)
     }
   }
 
   function onStartOver() {
     setSubmittedEmail(null)
-    setCooldown(0)
-    setResendError(null)
-    setResendMessage(null)
     setError(null)
-    setResending(false)
     setLoading(false)
   }
 
@@ -132,32 +87,8 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-center text-sm text-slate-600">
-            Didn&apos;t get it? Check your spam folder, or resend below.
+            Didn&apos;t get it? Check your spam folder, or use &quot;Start over&quot; below to re-enter your email and try again.
           </p>
-
-          <Button
-            type="button"
-            className="w-full bg-indigo-600 hover:bg-indigo-700"
-            onClick={onResend}
-            disabled={cooldown > 0 || resending}
-          >
-            {cooldown > 0
-              ? `Resend in ${cooldown}s`
-              : resending
-              ? 'Resending…'
-              : 'Resend confirmation email'}
-          </Button>
-
-          {resendMessage && (
-            <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
-              <AlertDescription>{resendMessage}</AlertDescription>
-            </Alert>
-          )}
-          {resendError && (
-            <Alert variant="destructive">
-              <AlertDescription>{resendError}</AlertDescription>
-            </Alert>
-          )}
 
           <div className="text-center">
             <button
@@ -165,7 +96,7 @@ export default function SignupPage() {
               onClick={onStartOver}
               className="text-sm text-slate-600 hover:text-indigo-600 hover:underline"
             >
-              Wrong email? Start over
+              Start over
             </button>
           </div>
 
