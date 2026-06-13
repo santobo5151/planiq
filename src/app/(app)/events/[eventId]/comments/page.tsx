@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, getUserProfile } from '@/lib/auth'
 import { getEventById } from '@/services/events'
 import { getCommentsForEvent } from '@/services/plan-comments'
 import { getMarketFromLocation } from '@/lib/localisation'
@@ -54,6 +54,11 @@ export default async function CommentsPage({
 
   if (event.planner_id !== user.id && event.created_by !== user.id) {
     redirect('/dashboard')
+  }
+
+  const profile = await getUserProfile()
+  if (profile?.planner_type === 'self') {
+    redirect(`/events/${params.eventId}`)
   }
 
   const raw = await getCommentsForEvent(params.eventId)
