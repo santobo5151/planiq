@@ -43,8 +43,7 @@ export async function getEventById(
   const event = data as PlanIQEvent
   const hasAccess =
     event.created_by === userId ||
-    event.planner_id === userId ||
-    event.client_id === userId
+    event.planner_id === userId
 
   return hasAccess ? event : null
 }

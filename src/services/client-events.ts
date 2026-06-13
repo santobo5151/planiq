@@ -1,5 +1,6 @@
 import 'server-only'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { EventPlan } from '@/types/database'
 
 // ── Shared types ─────────────────────────────────────────────────────────────
@@ -50,16 +51,21 @@ async function lookupPlannerName(
   plannerId: string | null,
   createdBy: string
 ): Promise<string | null> {
-  const supabase = createClient()
+  const supabase = createAdminClient()
   const id = plannerId ?? createdBy
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('full_name, business_name')
       .eq('id', id)
       .maybeSingle()
+    if (error) {
+      console.error('lookupPlannerName failed:', error.message)
+      return null
+    }
     return data?.business_name ?? data?.full_name ?? null
-  } catch {
+  } catch (e) {
+    console.error('lookupPlannerName threw:', e)
     return null
   }
 }
