@@ -12,7 +12,7 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, getUserProfile } from '@/lib/auth'
 import { getEventById, getEventPlan } from '@/services/events'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -49,6 +49,8 @@ export default async function EventOverviewPage({
   params: { eventId: string }
 }) {
   const user = await requireAuth()
+  const profile = await getUserProfile()
+  const isSelfPlanner = profile?.planner_type === 'self'
   const event = await getEventById(params.eventId, user.id)
   if (!event) redirect('/dashboard')
 
@@ -109,12 +111,14 @@ export default async function EventOverviewPage({
           </CardContent>
         </Card>
 
-        <div className="mt-6">
-          <SendInviteForm
-            eventId={event.id}
-            clientAlreadyLinked={Boolean(event.client_id)}
-          />
-        </div>
+        {!isSelfPlanner && (
+          <div className="mt-6">
+            <SendInviteForm
+              eventId={event.id}
+              clientAlreadyLinked={Boolean(event.client_id)}
+            />
+          </div>
+        )}
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-end">
           <Link
@@ -155,13 +159,15 @@ export default async function EventOverviewPage({
             <Store className="h-4 w-4" />
             Vendors
           </Link>
-          <Link
-            href={`/events/${event.id}/comments`}
-            className={buttonVariants({ variant: 'outline', className: 'gap-2' })}
-          >
-            <MessageSquare className="h-4 w-4" />
-            Comments
-          </Link>
+          {!isSelfPlanner && (
+            <Link
+              href={`/events/${event.id}/comments`}
+              className={buttonVariants({ variant: 'outline', className: 'gap-2' })}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Comments
+            </Link>
+          )}
           {hasPlan && (
             <Link
               href={`/events/${event.id}/plan`}

@@ -10,6 +10,7 @@ export interface Profile {
   role: UserRole | null
   full_name: string | null
   business_name: string | null
+  planner_type: 'professional' | 'self' | null
   avatar_url: string | null
   organization_id: string | null
   created_at: string

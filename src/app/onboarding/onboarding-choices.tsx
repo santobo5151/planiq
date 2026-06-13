@@ -29,7 +29,7 @@ export function OnboardingChoices() {
     setError(null)
     startTransition(async () => {
       try {
-        await setRole('planner', trimmed)
+        await setRole('planner', trimmed, 'professional')
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Something went wrong.')
       }
@@ -41,7 +41,7 @@ export function OnboardingChoices() {
     setError(null)
     startTransition(async () => {
       try {
-        await setRole('planner')
+        await setRole('planner', undefined, 'self')
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Something went wrong.')
         setSelected(null)
