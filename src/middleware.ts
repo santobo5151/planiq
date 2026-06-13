@@ -9,6 +9,35 @@ const VENDOR_PROTECTED = ['/vendor/dashboard', '/vendor/event', '/vendor/onboard
 // /vendor/invite and /vendor/login are intentionally public — vendors land there before authentication
 
 export async function middleware(request: NextRequest) {
+  const hostname = (request.headers.get('host') || '')
+    .toLowerCase()
+    .split(':')[0]
+
+  const isMarketingHost =
+    hostname === 'planiq.ai' || hostname === 'www.planiq.ai'
+
+  if (isMarketingHost) {
+    const { pathname } = request.nextUrl
+
+    const normalisedPathname =
+      pathname !== '/' && pathname.endsWith('/')
+        ? pathname.slice(0, -1)
+        : pathname
+
+    const marketingRoutes = new Set(['/', '/contact', '/privacy', '/terms'])
+
+    if (marketingRoutes.has(normalisedPathname)) {
+      return NextResponse.next()
+    }
+
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.protocol = 'https:'
+    redirectUrl.hostname = 'app.planiq.ai'
+    redirectUrl.port = ''
+
+    return NextResponse.redirect(redirectUrl, 307)
+  }
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   })
